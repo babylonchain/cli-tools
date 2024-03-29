@@ -8,6 +8,7 @@ import (
 	staking "github.com/babylonchain/babylon/btcstaking"
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
+	"github.com/babylonchain/cli-tools/internal/db"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -221,9 +222,11 @@ type UnbondingPipeline struct {
 func NewUnbondingPipelineFromConfig(
 	logger *slog.Logger,
 	cfg *config.Config,
+	// TODO: Consider where do we want to connect to db
+	db *db.Database,
 ) (*UnbondingPipeline, error) {
-	// TODO: Swtich to mongo after adding support for it
-	store := NewInMemoryUnbondingStore()
+
+	store := NewPersistentUnbondingStorage(db)
 
 	client, err := btcclient.NewBtcClient(&cfg.Btc)
 
