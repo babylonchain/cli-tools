@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/babylonchain/cli-tools/internal/config"
-	"github.com/babylonchain/cli-tools/internal/db"
 	"github.com/babylonchain/cli-tools/internal/logger"
 	"github.com/babylonchain/cli-tools/internal/services"
 
@@ -32,18 +31,12 @@ var runUnbondingPipelineCmd = &cobra.Command{
 
 		log := logger.DefaultLogger()
 
-		db, err := db.New(context.TODO(), cfg.Db.DbName, cfg.Db.Address)
+		pipeLine, err := services.NewUnbondingPipelineFromConfig(log, cfg)
 
 		if err != nil {
 			return err
 		}
 
-		pipeLine, err := services.NewUnbondingPipelineFromConfig(log, cfg, db)
-
-		if err != nil {
-			return err
-		}
-
-		return pipeLine.Run()
+		return pipeLine.Run(context.Background())
 	},
 }

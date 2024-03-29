@@ -49,7 +49,7 @@ type TestManager struct {
 	magicBytes          []byte
 	pipeLineConfig      *config.Config
 	pipeLine            *services.UnbondingPipeline
-	store               *services.PersistentUnbondingStorage
+	testStoreController *services.PersistentUnbondingStorage
 }
 
 type stakingData struct {
@@ -161,13 +161,14 @@ func StartManager(
 	fpKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
-	db, err := db.New(context.TODO(), appConfig.Db.DbName, appConfig.Db.Address)
+	testDbConnection, err := db.New(context.TODO(), appConfig.Db.DbName, appConfig.Db.Address)
 	require.NoError(t, err)
+
+	storeController := services.NewPersistentUnbondingStorage(testDbConnection)
 
 	pipeLine, err := services.NewUnbondingPipelineFromConfig(
 		logger,
 		appConfig,
-		db,
 	)
 	require.NoError(t, err)
 
@@ -185,8 +186,7 @@ func StartManager(
 		magicBytes:          []byte{0x0, 0x1, 0x2, 0x3},
 		pipeLineConfig:      appConfig,
 		pipeLine:            pipeLine,
-		// TODO: Remove this hack
-		store: pipeLine.Store().(*services.PersistentUnbondingStorage),
+		testStoreController: storeController,
 	}
 }
 
@@ -334,7 +334,7 @@ func TestRunningPipeline(t *testing.T) {
 	// 2. Add all unbonding transactions to store
 	for _, u := range ubts {
 		ubs := u
-		err := m.store.AddTxWithSignature(
+		err := m.testStoreController.AddTxWithSignature(
 			context.Background(),
 			ubs.unbondingTx,
 			ubs.signature,
@@ -344,12 +344,12 @@ func TestRunningPipeline(t *testing.T) {
 	}
 
 	// 3. Check store is not empty
-	txRequireProcessingBefore, err := m.store.GetNotProcessedUnbondingTransactions()
+	txRequireProcessingBefore, err := m.testStoreController.GetNotProcessedUnbondingTransactions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, txRequireProcessingBefore, numUnbondingTxs)
 
 	// 4. Run pipeline
-	err = m.pipeLine.Run()
+	err = m.pipeLine.Run(context.Background())
 	require.NoError(t, err)
 
 	// 5. Generate few block to make sure transactions are included in btc
@@ -365,7 +365,7 @@ func TestRunningPipeline(t *testing.T) {
 	}
 
 	// 7. Check there is no more transactions to process
-	txRequireProcessingAfter, err := m.store.GetNotProcessedUnbondingTransactions()
+	txRequireProcessingAfter, err := m.testStoreController.GetNotProcessedUnbondingTransactions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, txRequireProcessingAfter, 0)
 }

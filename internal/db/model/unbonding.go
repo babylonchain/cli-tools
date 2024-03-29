@@ -11,16 +11,14 @@ const (
 type UnbondingState string
 
 const (
-	Inserted          UnbondingState = "INSERTED"
-	Send              UnbondingState = "SEND"
+	Inserted UnbondingState = "INSERTED"
+	Send     UnbondingState = "SEND"
+	// TODO: This is not used now, but it will be necessary to cover the case when
+	// we try to send unbonding transaction but someone already withdrew the staking
+	// output
 	InputAlreadySpent UnbondingState = "INPUT_ALREADY_SPENT"
 	Failed            UnbondingState = "FAILED"
 )
-
-// StakerPk           *btcec.PublicKey
-// FinalityProviderPk *btcec.PublicKey
-// StakingTime        uint16
-// StakingAmount      btcutil.Amount
 
 type UnbondingDocument struct {
 	ID                 primitive.ObjectID `bson:"_id"`

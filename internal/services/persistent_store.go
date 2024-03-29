@@ -14,7 +14,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-func NewBTCTxFromBytes(txBytes []byte) (*wire.MsgTx, error) {
+func newBTCTxFromBytes(txBytes []byte) (*wire.MsgTx, error) {
 	var msgTx wire.MsgTx
 	rbuf := bytes.NewReader(txBytes)
 	if err := msgTx.Deserialize(rbuf); err != nil {
@@ -24,13 +24,13 @@ func NewBTCTxFromBytes(txBytes []byte) (*wire.MsgTx, error) {
 	return &msgTx, nil
 }
 
-func NewBTCTxFromHex(txHex string) (*wire.MsgTx, []byte, error) {
+func newBTCTxFromHex(txHex string) (*wire.MsgTx, []byte, error) {
 	txBytes, err := hex.DecodeString(txHex)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	parsed, err := NewBTCTxFromBytes(txBytes)
+	parsed, err := newBTCTxFromBytes(txBytes)
 
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +39,7 @@ func NewBTCTxFromHex(txHex string) (*wire.MsgTx, []byte, error) {
 	return parsed, txBytes, nil
 }
 
-func SerializeBTCTx(tx *wire.MsgTx) ([]byte, error) {
+func serializeBTCTx(tx *wire.MsgTx) ([]byte, error) {
 	var txBuf bytes.Buffer
 	if err := tx.Serialize(&txBuf); err != nil {
 		return nil, err
@@ -47,8 +47,8 @@ func SerializeBTCTx(tx *wire.MsgTx) ([]byte, error) {
 	return txBuf.Bytes(), nil
 }
 
-func SerializeBTCTxToHex(tx *wire.MsgTx) (string, error) {
-	bytes, err := SerializeBTCTx(tx)
+func serializeBTCTxToHex(tx *wire.MsgTx) (string, error) {
+	bytes, err := serializeBTCTx(tx)
 
 	if err != nil {
 		return "", err
@@ -86,7 +86,7 @@ func NewPersistentUnbondingStorage(
 }
 
 func documentToData(d *model.UnbondingDocument) (*UnbondingTxData, error) {
-	tx, _, err := NewBTCTxFromHex(d.UnbondingTxHex)
+	tx, _, err := newBTCTxFromHex(d.UnbondingTxHex)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (s *PersistentUnbondingStorage) AddTxWithSignature(
 	tx *wire.MsgTx,
 	sig *schnorr.Signature,
 	info *StakingInfo) error {
-	txHex, err := SerializeBTCTxToHex(tx)
+	txHex, err := serializeBTCTxToHex(tx)
 	if err != nil {
 		return err
 	}
@@ -164,8 +164,8 @@ func (s *PersistentUnbondingStorage) AddTxWithSignature(
 	return nil
 }
 
-func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions() ([]*UnbondingTxData, error) {
-	docs, err := s.client.FindNewUnbondingDocuments(context.Background())
+func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions(ctx context.Context) ([]*UnbondingTxData, error) {
+	docs, err := s.client.FindNewUnbondingDocuments(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -182,12 +182,12 @@ func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions() ([]*
 	return res, nil
 }
 
-func (s *PersistentUnbondingStorage) SetUnbondingTransactionProcessed(utx *UnbondingTxData) error {
+func (s *PersistentUnbondingStorage) SetUnbondingTransactionProcessed(ctx context.Context, utx *UnbondingTxData) error {
 	txHash := utx.UnbondingTransactionHash.String()
-	return s.client.SetUnbondingDocumentSend(context.Background(), txHash)
+	return s.client.SetUnbondingDocumentSend(ctx, txHash)
 }
 
-func (s *PersistentUnbondingStorage) SetUnbondingTransactionProcessingFailed(utx *UnbondingTxData) error {
+func (s *PersistentUnbondingStorage) SetUnbondingTransactionProcessingFailed(ctx context.Context, utx *UnbondingTxData) error {
 	txHash := utx.UnbondingTransactionHash.String()
-	return s.client.SetUnbondingDocumentFailed(context.Background(), txHash)
+	return s.client.SetUnbondingDocumentFailed(ctx, txHash)
 }
