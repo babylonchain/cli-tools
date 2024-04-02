@@ -356,6 +356,10 @@ func TestRunningPipeline(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, txRequireProcessingBefore, numUnbondingTxs)
 
+	alreadySend, err := m.testStoreController.GetSendUnbondingTransactions(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, alreadySend, 0)
+
 	// 4. Run pipeline
 	err = m.pipeLine.Run(context.Background())
 	require.NoError(t, err)
@@ -372,8 +376,13 @@ func TestRunningPipeline(t *testing.T) {
 		require.Equal(t, btcclient.TxInChain, status)
 	}
 
-	// 7. Check there is no more transactions to process
+	// 7. Check there is no more transactions to process, and all previous transactions
+	// are considered send
 	txRequireProcessingAfter, err := m.testStoreController.GetNotProcessedUnbondingTransactions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, txRequireProcessingAfter, 0)
+
+	sendTransactions, err := m.testStoreController.GetSendUnbondingTransactions(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, sendTransactions, numUnbondingTxs)
 }

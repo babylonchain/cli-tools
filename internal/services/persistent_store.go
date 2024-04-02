@@ -189,8 +189,10 @@ func (s *PersistentUnbondingStorage) AddTxWithSignature(
 	return nil
 }
 
-func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions(ctx context.Context) ([]*UnbondingTxData, error) {
-	docs, err := s.client.FindNewUnbondingDocuments(ctx)
+func transformDocuments(
+	ctx context.Context,
+	getDocuments func(ctx context.Context) ([]model.UnbondingDocument, error)) ([]*UnbondingTxData, error) {
+	docs, err := getDocuments(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +207,27 @@ func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions(ctx co
 	}
 
 	return res, nil
+}
+
+func (s *PersistentUnbondingStorage) GetSendUnbondingTransactions(ctx context.Context) ([]*UnbondingTxData, error) {
+	return transformDocuments(
+		ctx,
+		s.client.FindSendUnbondingDocuments,
+	)
+}
+
+func (s *PersistentUnbondingStorage) GetFailedUnbondingTransactions(ctx context.Context) ([]*UnbondingTxData, error) {
+	return transformDocuments(
+		ctx,
+		s.client.FindFailedUnbodningDocuments,
+	)
+}
+
+func (s *PersistentUnbondingStorage) GetNotProcessedUnbondingTransactions(ctx context.Context) ([]*UnbondingTxData, error) {
+	return transformDocuments(
+		ctx,
+		s.client.FindNewUnbondingDocuments,
+	)
 }
 
 func (s *PersistentUnbondingStorage) SetUnbondingTransactionProcessed(ctx context.Context, utx *UnbondingTxData) error {

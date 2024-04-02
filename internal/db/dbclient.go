@@ -68,10 +68,10 @@ func (db *Database) SaveUnbondingDocument(
 
 }
 
-func (db *Database) FindNewUnbondingDocuments(ctx context.Context) ([]model.UnbondingDocument, error) {
+func (db *Database) findUnbondingDocumentsWithState(ctx context.Context, state model.UnbondingState) ([]model.UnbondingDocument, error) {
 	client := db.Client.Database(db.DbName).Collection(model.UnbondingCollection)
 
-	filter := bson.M{"state": model.Inserted}
+	filter := bson.M{"state": state}
 	options := options.Find().SetSort(bson.M{"_id": 1}) // Sorting in ascending order
 
 	cursor, err := client.Find(ctx, filter, options)
@@ -86,6 +86,18 @@ func (db *Database) FindNewUnbondingDocuments(ctx context.Context) ([]model.Unbo
 	}
 
 	return delegations, nil
+}
+
+func (db *Database) FindNewUnbondingDocuments(ctx context.Context) ([]model.UnbondingDocument, error) {
+	return db.findUnbondingDocumentsWithState(ctx, model.Inserted)
+}
+
+func (db *Database) FindFailedUnbodningDocuments(ctx context.Context) ([]model.UnbondingDocument, error) {
+	return db.findUnbondingDocumentsWithState(ctx, model.Failed)
+}
+
+func (db *Database) FindSendUnbondingDocuments(ctx context.Context) ([]model.UnbondingDocument, error) {
+	return db.findUnbondingDocumentsWithState(ctx, model.Send)
 }
 
 func (db *Database) updateUnbondingDocumentState(

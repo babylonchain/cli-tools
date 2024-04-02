@@ -79,6 +79,10 @@ type UnbondingTxData struct {
 	StakingTransactionData   *StakingTransactionData
 }
 
+func (u UnbondingTxData) StakingOutput() *wire.TxOut {
+	return u.StakingTransactionData.StakingTransaction.TxOut[u.StakingTransactionData.StakingOutputIdx]
+}
+
 func NewUnbondingTxData(
 	tx *wire.MsgTx,
 	hash *chainhash.Hash,
