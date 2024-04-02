@@ -119,12 +119,12 @@ func documentToData(d *model.UnbondingDocument) (*UnbondingTxData, error) {
 
 	// TODO: Check if there are better types at mongo level
 	stakingValue := btcutil.Amount(int64(d.StakingAmount))
-	stakingTime := uint16(d.StakingTime)
+	stakingTime := uint16(d.StakingTimelock)
 
 	return NewUnbondingTxData(tx, unbondingTxHash, sig, &StakingInfo{
 		StakerPk:           stakerPk,
 		FinalityProviderPk: fpPk,
-		StakingTime:        stakingTime,
+		StakingTimelock:    stakingTime,
 		StakingAmount:      stakingValue,
 	}), nil
 }
@@ -154,7 +154,7 @@ func (s *PersistentUnbondingStorage) AddTxWithSignature(
 		sigHex,
 		stakerPkHex,
 		fpPkHex,
-		uint64(info.StakingTime),
+		uint64(info.StakingTimelock),
 		uint64(info.StakingAmount),
 	)
 

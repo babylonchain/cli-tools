@@ -295,7 +295,7 @@ func (tm *TestManager) createStakingInfo(d *stakingData) *services.StakingInfo {
 	return &services.StakingInfo{
 		StakerPk:           tm.stakerPubKey,
 		FinalityProviderPk: tm.finalityProviderKey.PubKey(),
-		StakingTime:        d.stakingTime,
+		StakingTimelock:    d.stakingTime,
 		StakingAmount:      d.stakingAmount,
 	}
 }

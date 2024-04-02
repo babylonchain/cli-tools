@@ -54,7 +54,7 @@ func (db *Database) SaveUnbondingDocument(
 		UnbondingTxSigHex:  unbondingTxSigHex,
 		StakerPkHex:        stakerPkHex,
 		FinalityPkHex:      finalityPkHex,
-		StakingTime:        stakingTime,
+		StakingTimelock:    stakingTime,
 		StakingAmount:      stakingAmount,
 		State:              model.Inserted,
 	}

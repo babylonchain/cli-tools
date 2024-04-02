@@ -27,7 +27,7 @@ type UnbondingDocument struct {
 	UnbondingTxSigHex  string             `bson:"unbonding_tx_sig_hex"`
 	StakerPkHex        string             `bson:"staker_pk_hex"`
 	FinalityPkHex      string             `bson:"finality_pk_hex"`
-	StakingTime        uint64             `bson:"staking_time"`
+	StakingTimelock    uint64             `bson:"staking_timelock"`
 	StakingAmount      uint64             `bson:"staking_amount"`
 	// TODO: Staking pkscript is not necessary here as we can derive it from other
 	// staking data + covenant_params. Although maybe it would be worth to have it

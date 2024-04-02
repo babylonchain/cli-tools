@@ -65,7 +65,7 @@ type ParamsRetriever interface {
 type StakingInfo struct {
 	StakerPk           *btcec.PublicKey
 	FinalityProviderPk *btcec.PublicKey
-	StakingTime        uint16
+	StakingTimelock    uint16
 	StakingAmount      btcutil.Amount
 }
 
