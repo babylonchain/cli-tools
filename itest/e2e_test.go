@@ -237,7 +237,7 @@ func (tm *TestManager) sendStakingTxToBtc(d *stakingData) *stakingTxSigInfo {
 	}
 }
 
-type unbondingTxWithStakerSig struct {
+type unbondingTxWithMetadata struct {
 	unbondingTx *wire.MsgTx
 	signature   *schnorr.Signature
 }
@@ -245,7 +245,7 @@ type unbondingTxWithStakerSig struct {
 func (tm *TestManager) createUnbondingTxAndSignByStaker(
 	si *stakingTxSigInfo,
 	d *stakingData,
-) *unbondingTxWithStakerSig {
+) *unbondingTxWithMetadata {
 
 	info, err := staking.BuildV0IdentifiableStakingOutputs(
 		tm.magicBytes,
@@ -285,7 +285,7 @@ func (tm *TestManager) createUnbondingTxAndSignByStaker(
 	)
 	require.NoError(tm.t, err)
 
-	return &unbondingTxWithStakerSig{
+	return &unbondingTxWithMetadata{
 		unbondingTx: unbondingTx,
 		signature:   unbondingTxSignature,
 	}
@@ -300,17 +300,20 @@ func (tm *TestManager) createStakingInfo(d *stakingData) *services.StakingInfo {
 	}
 }
 
-func (tm *TestManager) createNUnbondingTransactions(n int, d *stakingData) []*unbondingTxWithStakerSig {
+func (tm *TestManager) createNUnbondingTransactions(n int, d *stakingData) ([]*unbondingTxWithMetadata, []*wire.MsgTx) {
 	var infos []*stakingTxSigInfo
+	var sendStakingTransactions []*wire.MsgTx
+
 	for i := 0; i < n; i++ {
 		sInfo := tm.sendStakingTxToBtc(d)
-		_, status, err := tm.btcClient.TxDetails(sInfo.stakingTxHash, sInfo.stakingOutput.PkScript)
+		conf, status, err := tm.btcClient.TxDetails(sInfo.stakingTxHash, sInfo.stakingOutput.PkScript)
 		require.NoError(tm.t, err)
 		require.Equal(tm.t, btcclient.TxInChain, status)
 		infos = append(infos, sInfo)
+		sendStakingTransactions = append(sendStakingTransactions, conf.Tx)
 	}
 
-	var unbondingTxs []*unbondingTxWithStakerSig
+	var unbondingTxs []*unbondingTxWithMetadata
 	for _, i := range infos {
 		info := i
 		ubs := tm.createUnbondingTxAndSignByStaker(
@@ -320,7 +323,7 @@ func (tm *TestManager) createNUnbondingTransactions(n int, d *stakingData) []*un
 		unbondingTxs = append(unbondingTxs, ubs)
 	}
 
-	return unbondingTxs
+	return unbondingTxs, sendStakingTransactions
 }
 
 func TestRunningPipeline(t *testing.T) {
@@ -329,16 +332,21 @@ func TestRunningPipeline(t *testing.T) {
 	numUnbondingTxs := 10
 
 	// 1. Generate all unbonding transactions
-	ubts := m.createNUnbondingTransactions(numUnbondingTxs, d)
+	ubts, stakingTransactions := m.createNUnbondingTransactions(numUnbondingTxs, d)
 
 	// 2. Add all unbonding transactions to store
-	for _, u := range ubts {
+	for i, u := range ubts {
 		ubs := u
 		err := m.testStoreController.AddTxWithSignature(
 			context.Background(),
 			ubs.unbondingTx,
 			ubs.signature,
 			m.createStakingInfo(d),
+			&services.StakingTransactionData{
+				StakingTransaction: stakingTransactions[i],
+				// we always use 0 index for staking output in e2e tests
+				StakingOutputIdx: 0,
+			},
 		)
 		require.NoError(t, err)
 	}

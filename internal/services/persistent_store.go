@@ -121,25 +121,40 @@ func documentToData(d *model.UnbondingDocument) (*UnbondingTxData, error) {
 	stakingValue := btcutil.Amount(int64(d.StakingAmount))
 	stakingTime := uint16(d.StakingTimelock)
 
-	return NewUnbondingTxData(tx, unbondingTxHash, sig, &StakingInfo{
+	si := &StakingInfo{
 		StakerPk:           stakerPk,
 		FinalityProviderPk: fpPk,
 		StakingTimelock:    stakingTime,
 		StakingAmount:      stakingValue,
-	}), nil
+	}
+
+	stakingTx, _, err := newBTCTxFromHex(d.StakingTxHex)
+
+	if err != nil {
+		return nil, err
+	}
+
+	sd := &StakingTransactionData{
+		StakingTransaction: stakingTx,
+		StakingOutputIdx:   d.StakingOutputIndex,
+	}
+
+	return NewUnbondingTxData(tx, unbondingTxHash, sig, si, sd), nil
 }
 
 func (s *PersistentUnbondingStorage) AddTxWithSignature(
 	ctx context.Context,
 	tx *wire.MsgTx,
 	sig *schnorr.Signature,
-	info *StakingInfo) error {
-	txHex, err := serializeBTCTxToHex(tx)
+	info *StakingInfo,
+	stakingtTxData *StakingTransactionData,
+) error {
+	unbondingTxHex, err := serializeBTCTxToHex(tx)
 	if err != nil {
 		return err
 	}
 
-	txHash := tx.TxHash().String()
+	unbondingTxHashHex := tx.TxHash().String()
 
 	sigBytes := sig.Serialize()
 	sigHex := hex.EncodeToString(sigBytes)
@@ -147,13 +162,23 @@ func (s *PersistentUnbondingStorage) AddTxWithSignature(
 	stakerPkHex := pubKeyToString(info.StakerPk)
 	fpPkHex := pubKeyToString(info.FinalityProviderPk)
 
+	stakingTxHex, err := serializeBTCTxToHex(stakingtTxData.StakingTransaction)
+	if err != nil {
+		return err
+	}
+
+	stakingTxHashHex := stakingtTxData.StakingTransaction.TxHash().String()
+
 	err = s.client.SaveUnbondingDocument(
 		ctx,
-		txHash,
-		txHex,
+		unbondingTxHashHex,
+		unbondingTxHex,
 		sigHex,
 		stakerPkHex,
 		fpPkHex,
+		stakingTxHex,
+		stakingtTxData.StakingOutputIdx,
+		stakingTxHashHex,
 		uint64(info.StakingTimelock),
 		uint64(info.StakingAmount),
 	)

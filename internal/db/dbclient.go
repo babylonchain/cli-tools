@@ -5,7 +5,6 @@ import (
 
 	"github.com/babylonchain/cli-tools/internal/db/model"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -43,20 +42,25 @@ func (db *Database) SaveUnbondingDocument(
 	unbondingTxSigHex string,
 	stakerPkHex string,
 	finalityPkHex string,
+	stakingTxHex string,
+	stakingOutputIndex uint64,
+	stakingTxHashHex string,
 	stakingTime uint64,
 	stakingAmount uint64,
 ) error {
 	client := db.Client.Database(db.DbName).Collection(model.UnbondingCollection)
 	document := model.UnbondingDocument{
-		ID:                 primitive.NewObjectID(),
-		UnbondingTxHashHex: unbondingTxHashHex,
-		UnbondingTxHex:     unbondingTxHex,
-		UnbondingTxSigHex:  unbondingTxSigHex,
 		StakerPkHex:        stakerPkHex,
 		FinalityPkHex:      finalityPkHex,
+		UnbondingTxSigHex:  unbondingTxSigHex,
+		State:              model.Inserted,
+		UnbondingTxHashHex: unbondingTxHashHex,
+		UnbondingTxHex:     unbondingTxHex,
+		StakingTxHex:       stakingTxHex,
+		StakingOutputIndex: stakingOutputIndex,
 		StakingTimelock:    stakingTime,
 		StakingAmount:      stakingAmount,
-		State:              model.Inserted,
+		StakingTxHashHex:   stakingTxHashHex,
 	}
 	_, err := client.InsertOne(ctx, document)
 
