@@ -16,7 +16,7 @@ type SignRequest struct {
 	UnbondingTransaction *wire.MsgTx
 	// Staking output which was used to fund unbonding transaction
 	FundingOutput *wire.TxOut
-	//Script of the path which should be execute - unbonding path
+	// Script of the path which should be execute - unbonding path
 	UnbondingScript []byte
 	// Public key of the signer
 	SignerPubKey *btcec.PublicKey

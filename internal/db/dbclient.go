@@ -59,10 +59,9 @@ func (db *Database) SaveUnbondingDocument(
 		State:              model.Inserted,
 	}
 	_, err := client.InsertOne(ctx, document)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return err
+
 }
 
 func (db *Database) FindNewUnbondingDocuments(ctx context.Context) ([]model.UnbondingDocument, error) {
@@ -93,10 +92,7 @@ func (db *Database) updateUnbondingDocumentState(
 	filter := bson.M{"unbonding_tx_hash_hex": unbondingTxHashHex}
 	update := bson.M{"$set": bson.M{"state": newState}}
 	_, err := client.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (db *Database) SetUnbondingDocumentSend(

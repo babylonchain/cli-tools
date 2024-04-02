@@ -58,7 +58,7 @@ func serializeBTCTxToHex(tx *wire.MsgTx) (string, error) {
 
 }
 
-func pubKeyFromString(hexString string) (*btcec.PublicKey, error) {
+func pubKeyFromHex(hexString string) (*btcec.PublicKey, error) {
 	bytes, err := hex.DecodeString(hexString)
 	if err != nil {
 		return nil, err
@@ -107,12 +107,12 @@ func documentToData(d *model.UnbondingDocument) (*UnbondingTxData, error) {
 		return nil, err
 	}
 
-	stakerPk, err := pubKeyFromString(d.StakerPkHex)
+	stakerPk, err := pubKeyFromHex(d.StakerPkHex)
 	if err != nil {
 		return nil, err
 	}
 
-	fpPk, err := pubKeyFromString(d.FinalityPkHex)
+	fpPk, err := pubKeyFromHex(d.FinalityPkHex)
 	if err != nil {
 		return nil, err
 	}
