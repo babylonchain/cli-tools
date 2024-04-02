@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/babylonchain/cli-tools/internal/db/model"
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,22 +34,6 @@ func (db *Database) Ping(ctx context.Context) error {
 		return err
 	}
 	return nil
-}
-
-func (db *Database) FindUnbondingDocument(ctx context.Context, unbondingTxHash string) (*model.UnbondingDocument, error) {
-	client := db.Client.Database(db.DbName).Collection(model.UnbondingCollection)
-	filter := bson.M{"unbonding_tx_hash_hex": unbondingTxHash}
-	var delegation model.UnbondingDocument
-	err := client.FindOne(ctx, filter).Decode(&delegation)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	fmt.Println("Found unbonding document ID:")
-	fmt.Println(delegation.ID)
-	return &delegation, nil
 }
 
 func (db *Database) SaveUnbondingDocument(
