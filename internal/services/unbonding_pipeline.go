@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	staking "github.com/babylonchain/babylon/btcstaking"
+
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
 	"github.com/babylonchain/cli-tools/internal/db"

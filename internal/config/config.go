@@ -15,6 +15,7 @@ type Config struct {
 	Db     DbConfig           `mapstructure:"db-config"`
 	Btc    BtcConfig          `mapstructure:"btc-config"`
 	Params UnsafeParamsConfig `mapstructure:"unsafe-params-config"`
+	Signer RemoteSignerConfig `mapstructure:"remote-signer-config"`
 }
 
 func DefaultConfig() *Config {
@@ -22,12 +23,17 @@ func DefaultConfig() *Config {
 		Db:     *DefaultDBConfig(),
 		Btc:    *DefaultBtcConfig(),
 		Params: *DefaultUnsafeParamsConfig(),
+		Signer: *DefaultRemoteSignerConfig(),
 	}
 }
 
 func (cfg *Config) Validate() error {
 	if err := cfg.Db.Validate(); err != nil {
-		return err
+		return fmt.Errorf("invalid db config: %w", err)
+	}
+
+	if err := cfg.Signer.Validate(); err != nil {
+		return fmt.Errorf("invalid remote signer config: %w", err)
 	}
 
 	return nil
@@ -60,6 +66,14 @@ covenant_private_keys = [{{ range .Params.CovenantPrivateKeys }}{{ printf "%q, "
 
 # The quorum of the covenants required to sign the transaction
 covenant_quorum = {{ .Params.CovenantQuorum }}
+
+[remote-signer-config]
+# The host of the remote signing server
+host = {{ .Signer.Host }}
+# The port of the remote signing server
+port = {{ .Signer.Port }}
+# The timeout of each request to the remote signing server
+timeout = {{ .Signer.Timeout }}
 `
 
 var configTemplate *template.Template

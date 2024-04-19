@@ -14,12 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/babylonchain/cli-tools/internal/btcclient"
-	"github.com/babylonchain/cli-tools/internal/config"
-	"github.com/babylonchain/cli-tools/internal/db"
-	"github.com/babylonchain/cli-tools/internal/logger"
-	"github.com/babylonchain/cli-tools/internal/services"
-	"github.com/babylonchain/cli-tools/itest/containers"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -27,6 +21,13 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
+
+	"github.com/babylonchain/cli-tools/internal/btcclient"
+	"github.com/babylonchain/cli-tools/internal/config"
+	"github.com/babylonchain/cli-tools/internal/db"
+	"github.com/babylonchain/cli-tools/internal/logger"
+	"github.com/babylonchain/cli-tools/internal/services"
+	"github.com/babylonchain/cli-tools/itest/containers"
 )
 
 var (
@@ -64,7 +65,7 @@ func defaultStakingData() *stakingData {
 	return &stakingData{
 		stakingAmount:  btcutil.Amount(100000),
 		stakingTime:    10000,
-		stakingFeeRate: btcutil.Amount(5000), //feeRatePerKb
+		stakingFeeRate: btcutil.Amount(5000), // feeRatePerKb
 		unbondingTime:  100,
 		unbondingFee:   btcutil.Amount(10000),
 	}
