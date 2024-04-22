@@ -14,7 +14,7 @@ import (
 type Config struct {
 	Db     DbConfig           `mapstructure:"db-config"`
 	Btc    BtcConfig          `mapstructure:"btc-config"`
-	Params UnsafeParamsConfig `mapstructure:"unsafe-params-config"`
+	Params ParamsConfig       `mapstructure:"params-config"`
 	Signer RemoteSignerConfig `mapstructure:"remote-signer-config"`
 }
 
@@ -22,7 +22,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Db:     *DefaultDBConfig(),
 		Btc:    *DefaultBtcConfig(),
-		Params: *DefaultUnsafeParamsConfig(),
+		Params: *DefaultParamsConfig(),
 		Signer: *DefaultRemoteSignerConfig(),
 	}
 }
@@ -58,11 +58,9 @@ pass = "{{ .Btc.Pass }}"
 # Btc network (testnet3|mainnet|regtest|simnet|signet)
 network = "{{ .Btc.Network }}"
 
-# The unsafe params configuration only for poc/mvp purposes. Storing private keys
-# in the config file is not secure. After adding more secure options remove this.
-[unsafe-params-config]
-# The list of covenant private keys
-covenant_private_keys = [{{ range .Params.CovenantPrivateKeys }}{{ printf "%q, " . }}{{end}}]
+[params-config]
+# The list of covenant public keys
+covenant_public_keys = [{{ range .Params.CovenantPublicKeys }}{{ printf "%q, " . }}{{end}}]
 
 # The quorum of the covenants required to sign the transaction
 covenant_quorum = {{ .Params.CovenantQuorum }}

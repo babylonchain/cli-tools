@@ -15,6 +15,7 @@ type RemoteSigner struct {
 }
 
 func NewRemoteSigner(cfg *config.RemoteSignerConfig) (*RemoteSigner, error) {
+	// TODO we should be able to ping the remote signer
 	return &RemoteSigner{
 		url:     cfg.GetBaseUrl(),
 		timeout: cfg.Timeout,

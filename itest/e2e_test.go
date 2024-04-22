@@ -1,6 +1,3 @@
-//go:build e2e
-// +build e2e
-
 package e2etest
 
 import (
@@ -136,7 +133,7 @@ func StartManager(
 	appConfig.Btc.Pass = "pass"
 	appConfig.Btc.Network = netParams.Name
 
-	appConfig.Params.CovenantPrivateKeys = covenantKeysStrings
+	appConfig.Params.CovenantPublicKeys = covenantKeysStrings
 	appConfig.Params.CovenantQuorum = uint64(quorum)
 	appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
 

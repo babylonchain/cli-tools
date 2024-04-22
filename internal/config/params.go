@@ -5,51 +5,52 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
-type UnsafeParamsConfig struct {
-	CovenantPrivateKeys []string `mapstructure:"covenant_private_keys"`
-	CovenantQuorum      uint64   `mapstructure:"covenant_quorum"`
+type ParamsConfig struct {
+	CovenantPublicKeys []string `mapstructure:"covenant_public_keys"`
+	CovenantQuorum     uint64   `mapstructure:"covenant_quorum"`
 }
 
-func DefaultUnsafeParamsConfig() *UnsafeParamsConfig {
+func DefaultParamsConfig() *ParamsConfig {
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
 		panic(err)
 	}
 
-	encoded := hex.EncodeToString(privKey.Serialize())
+	encoded := hex.EncodeToString(schnorr.SerializePubKey(privKey.PubKey()))
 
-	return &UnsafeParamsConfig{
-		CovenantPrivateKeys: []string{encoded},
-		CovenantQuorum:      1,
+	return &ParamsConfig{
+		CovenantPublicKeys: []string{encoded},
+		CovenantQuorum:     1,
 	}
 }
 
-type ParsedUnsafeParamsConfig struct {
-	CovenantPrivateKeys []*btcec.PrivateKey
-	CovenantQuorum      uint32
+type ParsedParamsConfig struct {
+	CovenantPublicKeys []*btcec.PublicKey
+	CovenantQuorum     uint32
 }
 
-func (cfg *UnsafeParamsConfig) Parse() (*ParsedUnsafeParamsConfig, error) {
-	var covenantPrivateKeys []*btcec.PrivateKey
+func (cfg *ParamsConfig) Parse() (*ParsedParamsConfig, error) {
+	var covenantPublicKeys []*btcec.PublicKey
 
-	for _, key := range cfg.CovenantPrivateKeys {
+	for _, key := range cfg.CovenantPublicKeys {
 		decoded, err := hex.DecodeString(key)
 		if err != nil {
 			return nil, err
 		}
 
-		privKey, _ := btcec.PrivKeyFromBytes(decoded)
-		covenantPrivateKeys = append(covenantPrivateKeys, privKey)
+		pubKey, _ := schnorr.ParsePubKey(decoded)
+		covenantPublicKeys = append(covenantPublicKeys, pubKey)
 	}
 
-	if len(covenantPrivateKeys) < int(cfg.CovenantQuorum) {
+	if len(covenantPublicKeys) < int(cfg.CovenantQuorum) {
 		return nil, fmt.Errorf("not enough private keys for the quorum")
 	}
 
-	return &ParsedUnsafeParamsConfig{
-		CovenantPrivateKeys: covenantPrivateKeys,
-		CovenantQuorum:      uint32(cfg.CovenantQuorum),
+	return &ParsedParamsConfig{
+		CovenantPublicKeys: covenantPublicKeys,
+		CovenantQuorum:     uint32(cfg.CovenantQuorum),
 	}, nil
 }

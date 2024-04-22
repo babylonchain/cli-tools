@@ -91,30 +91,24 @@ func (s *StaticSigner) SignUnbondingTransaction(req *SignRequest) (*PubKeySigPai
 }
 
 type StaticParamsRetriever struct {
-	CovenantQuorum      uint32
-	CovenantPrivateKeys []*btcec.PrivateKey
+	CovenantQuorum     uint32
+	CovenantPublicKeys []*btcec.PublicKey
 }
 
 func NewStaticParamsRetriever(
 	quorum uint32,
-	privateKeys []*btcec.PrivateKey,
+	pubKeys []*btcec.PublicKey,
 ) *StaticParamsRetriever {
 	return &StaticParamsRetriever{
-		CovenantQuorum:      quorum,
-		CovenantPrivateKeys: privateKeys,
+		CovenantQuorum:     quorum,
+		CovenantPublicKeys: pubKeys,
 	}
 }
 
 func (p *StaticParamsRetriever) GetParams() (*SystemParams, error) {
-	publicKeys := make([]*btcec.PublicKey, 0, len(p.CovenantPrivateKeys))
-
-	for _, pk := range p.CovenantPrivateKeys {
-		publicKeys = append(publicKeys, pk.PubKey())
-	}
-
 	return &SystemParams{
 		CovenantQuorum:     p.CovenantQuorum,
-		CovenantPublicKeys: publicKeys,
+		CovenantPublicKeys: p.CovenantPublicKeys,
 	}, nil
 }
 
@@ -153,7 +147,7 @@ func NewUnbondingPipelineFromConfig(
 		return nil, err
 	}
 
-	signer, err := NewStaticSigner(parsedParams.CovenantPrivateKeys)
+	signer, err := NewRemoteSigner(&cfg.Signer)
 
 	if err != nil {
 		return nil, err
@@ -161,7 +155,7 @@ func NewUnbondingPipelineFromConfig(
 
 	paramsRetriever := NewStaticParamsRetriever(
 		parsedParams.CovenantQuorum,
-		parsedParams.CovenantPrivateKeys,
+		parsedParams.CovenantPublicKeys,
 	)
 
 	return NewUnbondingPipeline(
