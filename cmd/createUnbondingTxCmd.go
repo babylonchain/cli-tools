@@ -101,31 +101,31 @@ func getStakerPrivKey(
 	stakerKeyEven, err := btcec.ParsePubKey(keyCompressedEven[:])
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parse pub key keyCompressedEven %s", keyCompressedEven[:])
 	}
 
 	stakerKeyOdd, err := btcec.ParsePubKey(PubKeyFormatCompressedOdd[:])
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parse pub key PubKeyFormatCompressedOdd %s", PubKeyFormatCompressedOdd[:])
 	}
 
 	addressEven, err := pubKeyToAddress(stakerKeyEven, net)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error pubKeyToAddress")
 	}
 
 	addressOdd, err := pubKeyToAddress(stakerKeyOdd, net)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error pubKeyToAddress")
 	}
 
 	keyEven, err := client.DumpPrivateKey(addressEven)
 
 	if err == nil {
-		// it turned out that key is even retun early
+		// it turned out that key is even return early
 		return keyEven, nil
 	}
 
@@ -139,43 +139,43 @@ var createUnbondingTxCmd = &cobra.Command{
 		btcParams, err := getBtcNetworkParams(mustGetStringFlag(cmd, FlagNetwork))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("getBtcNetworkParams error: %s", err)
 		}
 
 		magicBytes, err := parseMagicBytesFromHex(mustGetStringFlag(cmd, FlagMagicBytes))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("parseMagicBytesFromHex error: %s", err)
 		}
 
 		stakingTx, _, err := newBTCTxFromHex(mustGetStringFlag(cmd, FlagStakingTxHex))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("newBTCTxFromHex error: %s", err)
 		}
 
 		covenantCommitteePks, err := parseCovenantKeysFromSlice(mustGetStringSliceFlag(cmd, FlagCovenantCommitteePks))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("parseCovenantKeysFromSlice error: %s", err)
 		}
 
 		covenantQuorum, err := parsePosNum(mustGetInt64Flag(cmd, FlagCovenantQuorum))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("parsePosNum error: %s", err)
 		}
 
 		unbondingTime, err := parseTimeLock(mustGetInt64Flag(cmd, FlagUnbondingTime))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("parseTimeLock error: %s", err)
 		}
 
 		unbondingFee, err := parseBtcAmount(mustGetInt64Flag(cmd, FlagUnbondingTxFee))
 
 		if err != nil {
-			return err
+			return fmt.Errorf("parseBtcAmount error: %s", err)
 		}
 
 		parsedStakingTx, err := btcstaking.ParseV0StakingTx(
@@ -187,7 +187,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("ParseV0StakingTx error: %s", err)
 		}
 
 		stakingTxHash := stakingTx.TxHash()
@@ -216,7 +216,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("BuildUnbondingInfo error: %s", err)
 		}
 
 		unbondingTx := wire.NewMsgTx(2)
@@ -228,7 +228,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		unbondingTxHex, err := serializeBTCTxToHex(unbondingTx)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("serializeBTCTxToHex error: %s", err)
 		}
 
 		resp := &CreateUnbondingResponse{
@@ -247,7 +247,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		host, err := cmd.Flags().GetString(FlagStakerWalletAddressHost)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("GetString FlagStakerWalletAddressHost error: %s", err)
 		}
 
 		if host == "" {
@@ -257,19 +257,19 @@ var createUnbondingTxCmd = &cobra.Command{
 		rpcUser, err := cmd.Flags().GetString(FlagStakerWalletRpcUser)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("GetString FlagStakerWalletRpcUser error: %s", err)
 		}
 
 		rpcPass, err := cmd.Flags().GetString(FlagStakerWalletRpcPass)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("GetString FlagStakerWalletRpcPass error: %s", err)
 		}
 
 		passphrase, err := cmd.Flags().GetString(FlagWalletPassphrase)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("GetString FlagWalletPassphrase error: %s", err)
 		}
 
 		client, err := btcclient.NewBtcClient(&config.BtcConfig{
@@ -280,7 +280,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		})
 
 		if err != nil {
-			return err
+			return fmt.Errorf("NewBtcClient error: %s", err)
 		}
 
 		stakerPrivKey, err := getStakerPrivKey(
@@ -291,7 +291,7 @@ var createUnbondingTxCmd = &cobra.Command{
 		)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("getStakerPrivKey error: %s", err)
 		}
 
 		// We got the staker key we need to create signature for unbonding tx on unbonding path
