@@ -253,11 +253,6 @@ var createWithdrawCmd = &cobra.Command{
 			}
 		}
 
-		// this should not happen
-		if info == nil {
-			return fmt.Errorf("info should not be nil after creating withdraw tx")
-		}
-
 		// at this point we created unsigned withdraw tx lets create response
 		serializedWithdrawTx, err := serializeBTCTxToHex(info.spendStakeTx)
 
