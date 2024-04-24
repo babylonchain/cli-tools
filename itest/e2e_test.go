@@ -1,6 +1,3 @@
-//go:build e2e
-// +build e2e
-
 package e2etest
 
 import (
@@ -128,14 +125,10 @@ func StartManager(
 	appConfig.Btc.Network = netParams.Name
 
 	magicBytes := []byte{0x0, 0x1, 0x2, 0x3}
-	covenantKeys, quorum, signingServer := startSigningServer(t, appConfig.Signer.Host, appConfig.Signer.Port, magicBytes)
+	signerCfg, quorum, signingServer := startSigningServer(t, magicBytes)
 
-	covenantKeysStr := make([]string, 0)
-	for _, key := range covenantKeys {
-		covenantKeysStr = append(covenantKeysStr, hex.EncodeToString(key.SerializeCompressed()))
-
-	}
-	appConfig.Params.CovenantPublicKeys = covenantKeysStr
+	appConfig.Signer = *signerCfg
+	appConfig.Params.CovenantPublicKeys = signerCfg.PublicKeys
 	appConfig.Params.CovenantQuorum = quorum
 	appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
 
@@ -172,12 +165,14 @@ func StartManager(
 	)
 	require.NoError(t, err)
 
+	parsedSignerCfg, err := signerCfg.Parse()
+	require.NoError(t, err)
 	return &TestManager{
 		t:                   t,
 		bitcoindHandler:     h,
 		walletPass:          passphrase,
 		btcClient:           client,
-		covenantPublicKeys:  covenantKeys,
+		covenantPublicKeys:  parsedSignerCfg.PublicKeys,
 		covenantQuorum:      quorum,
 		finalityProviderKey: fpKey,
 		stakerAddress:       walletAddress,
@@ -193,10 +188,8 @@ func StartManager(
 
 func startSigningServer(
 	t *testing.T,
-	host string,
-	port int,
 	magicBytes []byte,
-) ([]*btcec.PublicKey, uint32, *signerservice.SigningServer) {
+) (*config.RemoteSignerConfig, uint32, *signerservice.SigningServer) {
 	appConfig := signercfg.DefaultConfig()
 	logger := logger.DefaultLogger()
 	appConfig.BtcNodeConfig.Host = "127.0.0.1:18443"
@@ -237,15 +230,25 @@ func startSigningServer(
 	covPublicKeys = append(covPublicKeys, localCovenantKey2)
 
 	quorum := uint32(2)
+	host := "127.0.0.1"
+	port := 9791
+	urlStr := fmt.Sprintf("http://%s:%d", host, port)
+	covenantPksStr := []string{
+		hex.EncodeToString(localCovenantKey1.SerializeCompressed()),
+		hex.EncodeToString(localCovenantKey2.SerializeCompressed()),
+	}
+	signerCfg := &config.RemoteSignerConfig{
+		Urls:       []string{urlStr, urlStr},
+		PublicKeys: covenantPksStr,
+		Timeout:    10 * time.Second,
+	}
+
 	appConfig.Server.Host = host
 	appConfig.Server.Port = port
 	appConfig.Params.CovenantQuorum = quorum
 	appConfig.Params.MagicBytes = hex.EncodeToString(magicBytes)
 	appConfig.Params.W = 1
-	appConfig.Params.CovenantPublicKeys = []string{
-		hex.EncodeToString(localCovenantKey1.SerializeCompressed()),
-		hex.EncodeToString(localCovenantKey2.SerializeCompressed()),
-	}
+	appConfig.Params.CovenantPublicKeys = covenantPksStr
 
 	parsedconfig, err := appConfig.Parse()
 	require.NoError(t, err)
@@ -283,7 +286,7 @@ func startSigningServer(
 		_ = server.Stop(context.TODO())
 	})
 
-	return covPublicKeys, quorum, server
+	return signerCfg, quorum, server
 }
 
 type stakingTxSigInfo struct {

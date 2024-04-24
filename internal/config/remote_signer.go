@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultUrl     = "127.0.0.1:9791"
+	defaultUrl     = "http://127.0.0.1:9791"
 	defaultTimeout = 10 * time.Second
 )
 
