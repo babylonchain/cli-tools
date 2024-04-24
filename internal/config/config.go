@@ -65,6 +65,18 @@ covenant_public_keys = [{{ range .Params.CovenantPublicKeys }}{{ printf "%q, " .
 # The quorum of the covenants required to sign the transaction
 covenant_quorum = {{ .Params.CovenantQuorum }}
 
+# The magic bytes of the network
+magic_bytes = "{{ .Params.MagicBytes }}"
+
+# The number of confirmations required for the staking transaction to be mature
+w = {{ .Params.W }}
+
+# Timelock in unbonding transaction
+unbonding_time = {{ .Params.UnbondingTime }}
+
+# Required fee for unbonding transaction
+unbonding_fee = {{ .Params.UnbondingFee }}
+
 [remote-signer-config]
 # The host of the remote signing server
 host = {{ .Signer.Host }}

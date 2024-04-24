@@ -1,6 +1,3 @@
-//go:build e2e
-// +build e2e
-
 package e2etest
 
 import (
@@ -31,6 +28,10 @@ import (
 	"github.com/babylonchain/cli-tools/internal/logger"
 	"github.com/babylonchain/cli-tools/internal/services"
 	"github.com/babylonchain/cli-tools/itest/containers"
+)
+
+const (
+	passphrase = "pass"
 )
 
 var (
@@ -112,7 +113,6 @@ func StartManager(
 	// Give some time to launch mongo and bitcoind
 	time.Sleep(2 * time.Second)
 
-	passphrase := "pass"
 	_ = h.CreateWallet("test-wallet", passphrase)
 	// only outputs which are 100 deep are mature
 	_ = h.GenerateBlocks(int(numMatureOutputsInWallet) + 100)
@@ -133,7 +133,7 @@ func StartManager(
 
 	}
 	appConfig.Params.CovenantPublicKeys = covenantKeysStr
-	appConfig.Params.CovenantQuorum = uint64(quorum)
+	appConfig.Params.CovenantQuorum = quorum
 	appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
 
 	// Client for testing purposes
@@ -150,7 +150,7 @@ func StartManager(
 	walletAddress, err := btcutil.DecodeAddress(output.Address, netParams)
 	require.NoError(t, err)
 
-	err = client.UnlockWallet(20, passphrase)
+	err = client.UnlockWallet(60*60*60, passphrase)
 	require.NoError(t, err)
 	stakerPrivKey, err := client.DumpPrivateKey(walletAddress)
 	require.NoError(t, err)
@@ -207,7 +207,11 @@ func startSigningServer(
 	client, err := signerbtccli.NewBtcClient(fakeParsedConfig.BtcNodeConfig)
 	require.NoError(t, err)
 
-	// generate 2 local covenants and 1 remote covenant
+	// Unlock wallet for all tests 60min
+	err = client.UnlockWallet(60*60*60, passphrase)
+	require.NoError(t, err)
+
+	// generate 2 local covenants
 	covPublicKeys := make([]*btcec.PublicKey, 0)
 	covAddress1, err := client.RpcClient.GetNewAddress("covenant1")
 	require.NoError(t, err)
@@ -229,11 +233,6 @@ func startSigningServer(
 	require.NoError(t, err)
 	covPublicKeys = append(covPublicKeys, localCovenantKey2)
 
-	remoteCovenantKey, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	require.NotNil(t, remoteCovenantKey)
-	covPublicKeys = append(covPublicKeys, remoteCovenantKey.PubKey())
-
 	quorum := uint32(2)
 	appConfig.Server.Host = host
 	appConfig.Server.Port = port
@@ -243,7 +242,6 @@ func startSigningServer(
 	appConfig.Params.CovenantPublicKeys = []string{
 		hex.EncodeToString(localCovenantKey1.SerializeCompressed()),
 		hex.EncodeToString(localCovenantKey2.SerializeCompressed()),
-		hex.EncodeToString(remoteCovenantKey.PubKey().SerializeCompressed()),
 	}
 
 	parsedconfig, err := appConfig.Parse()

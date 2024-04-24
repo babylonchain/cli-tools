@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	staking "github.com/babylonchain/babylon/btcstaking"
+	"github.com/btcsuite/btcd/btcutil"
 
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
@@ -90,25 +91,41 @@ func (s *StaticSigner) SignUnbondingTransaction(req *SignRequest) (*PubKeySigPai
 	}, nil
 }
 
-type StaticParamsRetriever struct {
-	CovenantQuorum     uint32
+type SystemParamsRetriever struct {
 	CovenantPublicKeys []*btcec.PublicKey
+	CovenantQuorum     uint32
+	MagicBytes         []byte
+	W                  uint32
+	UnbondingTime      uint16
+	UnbondingFee       btcutil.Amount
 }
 
-func NewStaticParamsRetriever(
+func NewSystemParamsRetriever(
 	quorum uint32,
 	pubKeys []*btcec.PublicKey,
-) *StaticParamsRetriever {
-	return &StaticParamsRetriever{
+	magicBytes []byte,
+	w uint32,
+	unbondingTime uint16,
+	unbondingFee btcutil.Amount,
+) *SystemParamsRetriever {
+	return &SystemParamsRetriever{
 		CovenantQuorum:     quorum,
 		CovenantPublicKeys: pubKeys,
+		MagicBytes:         magicBytes,
+		W:                  w,
+		UnbondingTime:      unbondingTime,
+		UnbondingFee:       unbondingFee,
 	}
 }
 
-func (p *StaticParamsRetriever) GetParams() (*SystemParams, error) {
+func (p *SystemParamsRetriever) GetParams() (*SystemParams, error) {
 	return &SystemParams{
 		CovenantQuorum:     p.CovenantQuorum,
 		CovenantPublicKeys: p.CovenantPublicKeys,
+		MagicBytes:         p.MagicBytes,
+		W:                  p.W,
+		UnbondingTime:      p.UnbondingTime,
+		UnbondingFee:       p.UnbondingFee,
 	}, nil
 }
 
@@ -153,9 +170,13 @@ func NewUnbondingPipelineFromConfig(
 		return nil, err
 	}
 
-	paramsRetriever := NewStaticParamsRetriever(
+	paramsRetriever := NewSystemParamsRetriever(
 		parsedParams.CovenantQuorum,
 		parsedParams.CovenantPublicKeys,
+		parsedParams.MagicBytes,
+		parsedParams.W,
+		parsedParams.UnbondingTime,
+		parsedParams.UnbondingFee,
 	)
 
 	return NewUnbondingPipeline(
@@ -287,7 +308,7 @@ func (up *UnbondingPipeline) Run(ctx context.Context) error {
 		sigs, err := up.signUnbondingTransaction(
 			utx.UnbondingTransaction,
 			stakingOutputRecovered,
-			unbondingPathSpendInfo.RevealedLeaf.Script,
+			stakingOutputRecovered.PkScript,
 			params,
 		)
 
