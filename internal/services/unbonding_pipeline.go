@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	staking "github.com/babylonchain/babylon/btcstaking"
 	"github.com/btcsuite/btcd/btcutil"
 
 	"github.com/babylonchain/cli-tools/internal/btcclient"
@@ -34,61 +33,6 @@ func wrapCrititical(err error) error {
 
 func pubKeyToString(pubKey *btcec.PublicKey) string {
 	return hex.EncodeToString(schnorr.SerializePubKey(pubKey))
-}
-
-// signer with initialized in memory private keys
-type StaticSigner struct {
-	mapPubKey map[string]*btcec.PrivateKey
-}
-
-func NewStaticSigner(privateKeys []*btcec.PrivateKey) (*StaticSigner, error) {
-	if len(privateKeys) == 0 {
-		return nil, fmt.Errorf("no private keys provided for static signer")
-	}
-
-	mapPubKey := make(map[string]*btcec.PrivateKey)
-
-	for _, priv := range privateKeys {
-		k := priv
-
-		pubKeyHex := pubKeyToString(k.PubKey())
-
-		if _, found := mapPubKey[pubKeyHex]; found {
-			return nil, fmt.Errorf("duplicate public key provided for static signer")
-		}
-
-		mapPubKey[pubKeyHex] = k
-	}
-
-	return &StaticSigner{
-		mapPubKey: mapPubKey,
-	}, nil
-}
-
-func (s *StaticSigner) SignUnbondingTransaction(req *SignRequest) (*PubKeySigPair, error) {
-	pubKeyStr := pubKeyToString(req.SignerPubKey)
-
-	privKey, found := s.mapPubKey[pubKeyStr]
-
-	if !found {
-		return nil, fmt.Errorf("private key not found for public key %s", pubKeyStr)
-	}
-
-	signature, err := staking.SignTxWithOneScriptSpendInputFromScript(
-		req.UnbondingTransaction,
-		req.FundingOutput,
-		privKey,
-		req.UnbondingScript,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &PubKeySigPair{
-		Signature: signature,
-		PubKey:    req.SignerPubKey,
-	}, nil
 }
 
 type SystemParamsRetriever struct {
