@@ -32,7 +32,7 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("invalid db config: %w", err)
 	}
 
-	if err := cfg.Signer.Validate(); err != nil {
+	if _, err := cfg.Signer.Parse(); err != nil {
 		return fmt.Errorf("invalid remote signer config: %w", err)
 	}
 
@@ -67,10 +67,10 @@ covenant_quorum = {{ .Params.CovenantQuorum }}
 magic_bytes = "{{ .Params.MagicBytes }}"
 
 [remote-signer-config]
-# The host of the remote signing server
-host = {{ .Signer.Host }}
-# The port of the remote signing server
-port = {{ .Signer.Port }}
+# The list of signer public keys in 33 bytes compressed format
+public_keys = [{{ range .Signer.PublicKeys }}{{ printf "%q, " . }}{{end}}]
+# The list of signer urls
+urls = [{{ range .Signer.Urls }}{{ printf "%q, " . }}{{end}}]
 # The timeout of each request to the remote signing server
 timeout = {{ .Signer.Timeout }}
 `

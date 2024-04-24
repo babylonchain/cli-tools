@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/babylonchain/covenant-signer/signerservice"
@@ -10,22 +12,31 @@ import (
 )
 
 type RemoteSigner struct {
-	url     string
-	timeout time.Duration
+	pkToUrlMap map[string]string
+	timeout    time.Duration
 }
 
-func NewRemoteSigner(cfg *config.RemoteSignerConfig) (*RemoteSigner, error) {
-	// TODO we should be able to ping the remote signer
+func NewRemoteSigner(cfg *config.ParsedRemoteSignerConfig) (*RemoteSigner, error) {
+	pkToUrlMap, err := cfg.GetPubKeyToUrlMap()
+	if err != nil {
+		return nil, err
+	}
 	return &RemoteSigner{
-		url:     cfg.GetSignerUrl(),
-		timeout: cfg.Timeout,
+		pkToUrlMap: pkToUrlMap,
+		timeout:    cfg.Timeout,
 	}, nil
 }
 
 func (rs *RemoteSigner) SignUnbondingTransaction(req *SignRequest) (*PubKeySigPair, error) {
+	pkStr := hex.EncodeToString(req.SignerPubKey.SerializeCompressed())
+	url, ok := rs.pkToUrlMap[pkStr]
+	if !ok {
+		return nil, fmt.Errorf("cannot find the url of the requested signer %s", pkStr)
+	}
+
 	sig, err := signerservice.RequestCovenantSignaure(
 		context.Background(),
-		rs.url,
+		url,
 		rs.timeout,
 		req.UnbondingTransaction,
 		req.SignerPubKey,

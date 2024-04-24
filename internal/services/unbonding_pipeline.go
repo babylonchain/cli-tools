@@ -87,17 +87,22 @@ func NewUnbondingPipelineFromConfig(
 		return nil, err
 	}
 
+	parsedRemoteSignerCfg, err := cfg.Signer.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse remote signer config: %w", err)
+	}
+
+	signer, err := NewRemoteSigner(parsedRemoteSignerCfg)
+
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: Add parse func to other configs, and do parsing in one place
 	parsedParams, err := cfg.Params.Parse()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse params")
-	}
-
-	signer, err := NewRemoteSigner(&cfg.Signer)
-
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse params: %w", err)
 	}
 
 	paramsRetriever := NewSystemParamsRetriever(
