@@ -10,24 +10,24 @@ import (
 )
 
 const (
-	defaultUrl     = "http://127.0.0.1:9791"
+	defaultHost    = "http://127.0.0.1"
+	defaultPort    = 9791
 	defaultTimeout = 10 * time.Second
 )
 
 var (
-	privKey, _        = btcec.NewPrivateKey()
-	defaultUrls       = []string{defaultUrl}
-	defaultPublicKeys = []string{hex.EncodeToString(privKey.PubKey().SerializeCompressed())}
+	privKey, _       = btcec.NewPrivateKey()
+	defaultPublicKey = hex.EncodeToString(privKey.PubKey().SerializeCompressed())
+	defaultUrls      = fmt.Sprintf("http://%s@%s:%d", defaultPublicKey, defaultHost, defaultPort)
 )
 
 type RemoteSignerConfig struct {
-	Urls       []string      `mapstructure:"urls"`
-	PublicKeys []string      `mapstructure:"public_keys"`
-	Timeout    time.Duration `mapstructure:"timeout"`
+	Urls    []string      `mapstructure:"urls"` // in the format http://covenant_pk@signer_host:port
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 type ParsedRemoteSignerConfig struct {
-	Urls       []*url.URL
+	Urls       []string // in the format http://signer_host:port
 	PublicKeys []*btcec.PublicKey
 	Timeout    time.Duration
 }
@@ -38,32 +38,24 @@ func (c *RemoteSignerConfig) Parse() (*ParsedRemoteSignerConfig, error) {
 		return nil, fmt.Errorf("must have at least one url")
 	}
 
-	nPubKyes := len(c.PublicKeys)
-	if nPubKyes == 0 {
-		return nil, fmt.Errorf("must have at least one public key")
-	}
-
-	if nUrls != nPubKyes {
-		return nil, fmt.Errorf("the number of urls %d must match the number of public keys %d", nUrls, nPubKyes)
-	}
-
-	urls := make([]*url.URL, nUrls)
-	publicKeys := make([]*btcec.PublicKey, nPubKyes)
+	urls := make([]string, nUrls)
+	publicKeys := make([]*btcec.PublicKey, nUrls)
 	for i, urlStr := range c.Urls {
 		parsedUrl, err := url.Parse(urlStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid url %s: %w", urlStr, err)
 		}
-		urls[i] = parsedUrl
+		urls[i] = fmt.Sprintf("http://%s", parsedUrl.Host)
 
-		pkBytes, err := hex.DecodeString(c.PublicKeys[i])
+		publicKeyStr := parsedUrl.User.String()
+		pkBytes, err := hex.DecodeString(publicKeyStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid public key %s: %w", c.PublicKeys[i], err)
+			return nil, fmt.Errorf("invalid public key %s: %w", publicKeyStr, err)
 		}
 
 		pk, err := btcec.ParsePubKey(pkBytes)
 		if err != nil {
-			return nil, fmt.Errorf("invalid public key %s: %w", c.PublicKeys[i], err)
+			return nil, fmt.Errorf("invalid public key %s: %w", publicKeyStr, err)
 		}
 
 		publicKeys[i] = pk
@@ -98,7 +90,7 @@ func (pc *ParsedRemoteSignerConfig) GetPubKeyToUrlMap() (map[string]string, erro
 	mapPkToUrl := make(map[string]string)
 	for i, u := range pc.Urls {
 		pkStr := hex.EncodeToString(pc.PublicKeys[i].SerializeCompressed())
-		mapPkToUrl[pkStr] = u.String()
+		mapPkToUrl[pkStr] = u
 	}
 
 	return mapPkToUrl, nil
@@ -106,8 +98,7 @@ func (pc *ParsedRemoteSignerConfig) GetPubKeyToUrlMap() (map[string]string, erro
 
 func DefaultRemoteSignerConfig() *RemoteSignerConfig {
 	return &RemoteSignerConfig{
-		Urls:       defaultUrls,
-		PublicKeys: defaultPublicKeys,
-		Timeout:    defaultTimeout,
+		Urls:    []string{defaultUrls},
+		Timeout: defaultTimeout,
 	}
 }

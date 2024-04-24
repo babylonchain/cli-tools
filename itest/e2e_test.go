@@ -1,3 +1,6 @@
+//go:build e2e
+// +build e2e
+
 package e2etest
 
 import (
@@ -126,9 +129,12 @@ func StartManager(
 
 	magicBytes := []byte{0x0, 0x1, 0x2, 0x3}
 	signerCfg, quorum, signingServer := startSigningServer(t, magicBytes)
+	parsedSignerCfg, err := signerCfg.Parse()
+	require.NoError(t, err)
+	covenantPublicKeysStr := pubKeysToString(parsedSignerCfg.PublicKeys)
 
 	appConfig.Signer = *signerCfg
-	appConfig.Params.CovenantPublicKeys = signerCfg.PublicKeys
+	appConfig.Params.CovenantPublicKeys = covenantPublicKeysStr
 	appConfig.Params.CovenantQuorum = quorum
 	appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
 
@@ -165,7 +171,6 @@ func StartManager(
 	)
 	require.NoError(t, err)
 
-	parsedSignerCfg, err := signerCfg.Parse()
 	require.NoError(t, err)
 	return &TestManager{
 		t:                   t,
@@ -232,15 +237,17 @@ func startSigningServer(
 	quorum := uint32(2)
 	host := "127.0.0.1"
 	port := 9791
-	urlStr := fmt.Sprintf("http://%s:%d", host, port)
 	covenantPksStr := []string{
 		hex.EncodeToString(localCovenantKey1.SerializeCompressed()),
 		hex.EncodeToString(localCovenantKey2.SerializeCompressed()),
 	}
+	urlsStr := []string{
+		fmt.Sprintf("http://%s@%s:%d", covenantPksStr[0], host, port),
+		fmt.Sprintf("http://%s@%s:%d", covenantPksStr[1], host, port),
+	}
 	signerCfg := &config.RemoteSignerConfig{
-		Urls:       []string{urlStr, urlStr},
-		PublicKeys: covenantPksStr,
-		Timeout:    10 * time.Second,
+		Urls:    urlsStr,
+		Timeout: 10 * time.Second,
 	}
 
 	appConfig.Server.Host = host
@@ -475,4 +482,14 @@ func TestRunningPipeline(t *testing.T) {
 	sendTransactions, err := m.testStoreController.GetSendUnbondingTransactions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sendTransactions, numUnbondingTxs)
+}
+
+func pubKeysToString(pubKeys []*btcec.PublicKey) []string {
+	pubKeysStr := make([]string, len(pubKeys))
+	for i, pk := range pubKeys {
+		pkStr := hex.EncodeToString(pk.SerializeCompressed())
+		pubKeysStr[i] = pkStr
+	}
+
+	return pubKeysStr
 }

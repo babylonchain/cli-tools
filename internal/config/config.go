@@ -67,9 +67,7 @@ covenant_quorum = {{ .Params.CovenantQuorum }}
 magic_bytes = "{{ .Params.MagicBytes }}"
 
 [remote-signer-config]
-# The list of signer public keys in 33 bytes compressed format
-public_keys = [{{ range .Signer.PublicKeys }}{{ printf "%q, " . }}{{end}}]
-# The list of signer urls
+# The list of signer urls in the format http://covenant_pk@signer_host:port
 urls = [{{ range .Signer.Urls }}{{ printf "%q, " . }}{{end}}]
 # The timeout of each request to the remote signing server
 timeout = {{ .Signer.Timeout }}
