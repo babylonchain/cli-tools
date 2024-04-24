@@ -41,7 +41,7 @@ func (cfg *ParamsConfig) Parse() (*ParsedParamsConfig, error) {
 			return nil, err
 		}
 
-		pubKey, _ := schnorr.ParsePubKey(decoded)
+		pubKey, _ := btcec.ParsePubKey(decoded)
 		covenantPublicKeys = append(covenantPublicKeys, pubKey)
 	}
 

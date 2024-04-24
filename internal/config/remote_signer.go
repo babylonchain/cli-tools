@@ -34,7 +34,7 @@ func (c *RemoteSignerConfig) Validate() error {
 	return nil
 }
 
-func (c *RemoteSignerConfig) GetBaseUrl() string {
+func (c *RemoteSignerConfig) GetSignerUrl() string {
 	return fmt.Sprintf("http://%s:%d", c.Host, c.Port)
 }
 

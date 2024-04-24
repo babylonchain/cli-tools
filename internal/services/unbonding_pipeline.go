@@ -144,7 +144,7 @@ func NewUnbondingPipelineFromConfig(
 	parsedParams, err := cfg.Params.Parse()
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse params")
 	}
 
 	signer, err := NewRemoteSigner(&cfg.Signer)
