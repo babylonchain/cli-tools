@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/btcsuite/btcd/btcutil"
-
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
 	"github.com/babylonchain/cli-tools/internal/db"
@@ -39,26 +37,17 @@ type SystemParamsRetriever struct {
 	CovenantPublicKeys []*btcec.PublicKey
 	CovenantQuorum     uint32
 	MagicBytes         []byte
-	W                  uint32
-	UnbondingTime      uint16
-	UnbondingFee       btcutil.Amount
 }
 
 func NewSystemParamsRetriever(
 	quorum uint32,
 	pubKeys []*btcec.PublicKey,
 	magicBytes []byte,
-	w uint32,
-	unbondingTime uint16,
-	unbondingFee btcutil.Amount,
 ) *SystemParamsRetriever {
 	return &SystemParamsRetriever{
 		CovenantQuorum:     quorum,
 		CovenantPublicKeys: pubKeys,
 		MagicBytes:         magicBytes,
-		W:                  w,
-		UnbondingTime:      unbondingTime,
-		UnbondingFee:       unbondingFee,
 	}
 }
 
@@ -67,9 +56,6 @@ func (p *SystemParamsRetriever) GetParams() (*SystemParams, error) {
 		CovenantQuorum:     p.CovenantQuorum,
 		CovenantPublicKeys: p.CovenantPublicKeys,
 		MagicBytes:         p.MagicBytes,
-		W:                  p.W,
-		UnbondingTime:      p.UnbondingTime,
-		UnbondingFee:       p.UnbondingFee,
 	}, nil
 }
 
@@ -118,9 +104,6 @@ func NewUnbondingPipelineFromConfig(
 		parsedParams.CovenantQuorum,
 		parsedParams.CovenantPublicKeys,
 		parsedParams.MagicBytes,
-		parsedParams.W,
-		parsedParams.UnbondingTime,
-		parsedParams.UnbondingFee,
 	)
 
 	return NewUnbondingPipeline(

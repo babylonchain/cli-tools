@@ -54,9 +54,6 @@ type SystemParams struct {
 	CovenantPublicKeys []*btcec.PublicKey
 	CovenantQuorum     uint32
 	MagicBytes         []byte
-	W                  uint32
-	UnbondingTime      uint16
-	UnbondingFee       btcutil.Amount
 }
 
 type ParamsRetriever interface {
