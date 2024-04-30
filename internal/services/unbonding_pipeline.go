@@ -154,28 +154,16 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 			unbondingScript,
 			pk,
 		)
-		up.logger.Debug("request signatures from covenant signer",
-			"signer_pk", pubKeyToString(pk))
 		go up.requestSigFromCovenant(req, resultChan)
 	}
 
 	// check all the results
 	var signatures []*PubKeySigPair
-	for _, pk := range params.CovenantPublicKeys {
+	for i := 0; i < len(params.CovenantPublicKeys); i++ {
 		res := <-resultChan
-		pkStr := pubKeyToString(pk)
 		if res.Err != nil {
-			// TODO: record metrics
-			up.logger.Error("failed to get signatures",
-				"signer_pk", pkStr,
-				"error", res.Err)
-
 			continue
 		}
-
-		// TODO: record metrics
-		up.logger.Debug("got signatures from covenant signer", "signer_pk", pkStr)
-
 		signatures = append(signatures, res.PubKeySig)
 	}
 
@@ -188,12 +176,27 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 }
 
 func (up *UnbondingPipeline) requestSigFromCovenant(req *SignRequest, resultChan chan *SignResult) {
-	sigPair, err := up.signer.SignUnbondingTransaction(req)
+	pkStr := pubKeyToString(req.SignerPubKey)
+	up.logger.Debug("request signatures from covenant signer",
+		"signer_pk", pkStr)
 
-	resultChan <- &SignResult{
-		PubKeySig: sigPair,
-		Err:       err,
+	var res SignResult
+	sigPair, err := up.signer.SignUnbondingTransaction(req)
+	if err != nil {
+		// TODO record metrics
+		up.logger.Error("failed to get signatures from covenant",
+			"signer_pk", pkStr,
+			"error", res.Err)
+
+		res.Err = err
+	} else {
+		// TODO: record metrics
+		up.logger.Debug("got signatures from covenant signer", "signer_pk", pkStr)
+
+		res.PubKeySig = sigPair
 	}
+
+	resultChan <- &res
 }
 
 func (up *UnbondingPipeline) Store() UnbondingStore {
