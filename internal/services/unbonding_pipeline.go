@@ -145,33 +145,55 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 	unbondingScript []byte,
 	params *SystemParams,
 ) ([]*PubKeySigPair, error) {
-	var requests []*SignRequest
-
-	// TODO: Naive serialized way. In practice request shoud be done:
-	// - in parallel
-	// - only params.CovenantQuorum/len(params.CovenantPublicKeys) is required to succeed
+	// send requests concurrently
+	resultChan := make(chan *SignResult, len(params.CovenantPublicKeys))
 	for _, pk := range params.CovenantPublicKeys {
-		requests = append(requests, NewSignRequest(
+		req := NewSignRequest(
 			unbondingTransaction,
 			fundingOutput,
 			unbondingScript,
 			pk,
-		))
+		)
+		up.logger.Debug("request signatures from covenant signer",
+			"signer_pk", pubKeyToString(pk))
+		go up.requestSigFromCovenant(req, resultChan)
 	}
 
+	// check all the results
 	var signatures []*PubKeySigPair
+	for _, pk := range params.CovenantPublicKeys {
+		res := <-resultChan
+		pkStr := pubKeyToString(pk)
+		if res.Err != nil {
+			// TODO: record metrics
+			up.logger.Error("failed to get signatures",
+				"signer_pk", pkStr,
+				"error", res.Err)
 
-	for _, req := range requests {
-		sig, err := up.signer.SignUnbondingTransaction(req)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign unbonding tx: %w", err)
+			continue
 		}
 
-		signatures = append(signatures, sig)
+		// TODO: record metrics
+		up.logger.Debug("got signatures from covenant signer", "signer_pk", pkStr)
+
+		signatures = append(signatures, res.PubKeySig)
+	}
+
+	if len(signatures) < int(params.CovenantQuorum) {
+		return nil, fmt.Errorf("insufficient covenant signatures: expected %d, got: %d",
+			params.CovenantQuorum, len(signatures))
 	}
 
 	return signatures, nil
+}
+
+func (up *UnbondingPipeline) requestSigFromCovenant(req *SignRequest, resultChan chan *SignResult) {
+	sigPair, err := up.signer.SignUnbondingTransaction(req)
+
+	resultChan <- &SignResult{
+		PubKeySig: sigPair,
+		Err:       err,
+	}
 }
 
 func (up *UnbondingPipeline) Store() UnbondingStore {
@@ -248,6 +270,10 @@ func (up *UnbondingPipeline) Run(ctx context.Context) error {
 			return wrapCrititical(err)
 		}
 
+		up.logger.Info("Successfully collected quorum of covenant signatures to unbond",
+			"staking_tx_hash", tx.StakingTransactionData.StakingTransaction.TxHash().String(),
+			"unbonding_tx_hash", tx.UnbondingTransactionHash.String())
+
 		// TODO this functions re-creates staking output, maybe we should compare it with
 		// staking output from db for double check
 		witness, err := CreateUnbondingTxWitness(
@@ -268,13 +294,13 @@ func (up *UnbondingPipeline) Run(ctx context.Context) error {
 		hash, err := up.sender.SendTx(utx.UnbondingTransaction)
 
 		if err != nil {
-			up.logger.Error("Failed to send unbonding transaction: %v", err)
+			up.logger.Error("Failed to send unbonding transaction", "error", err)
 			if err := up.store.SetUnbondingTransactionProcessingFailed(ctx, utx); err != nil {
 				return wrapCrititical(err)
 			}
 		} else {
 			up.logger.Info(
-				"Succesfully sent unbonding transaction",
+				"Successfully sent unbonding transaction",
 				slog.String("tx_hash", hash.String()),
 			)
 			if err := up.store.SetUnbondingTransactionProcessed(ctx, utx); err != nil {
