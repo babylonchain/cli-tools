@@ -139,6 +139,8 @@ func NewUnbondingPipeline(
 	}
 }
 
+// signUnbondingTransaction requests signatures from all the
+// covenant signers in a concurrent manner
 func (up *UnbondingPipeline) signUnbondingTransaction(
 	unbondingTransaction *wire.MsgTx,
 	fundingOutput *wire.TxOut,
@@ -158,6 +160,8 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 	}
 
 	// check all the results
+	// Note that the latency of processing all the results depends on
+	// the slowest response
 	var signatures []*PubKeySigPair
 	for i := 0; i < len(params.CovenantPublicKeys); i++ {
 		res := <-resultChan
@@ -172,7 +176,9 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 			params.CovenantQuorum, len(signatures))
 	}
 
-	return signatures, nil
+	// return a quorum is enough as the script is using OP_NUMEQUAL op code
+	// ordered by the order of arrival
+	return signatures[:params.CovenantQuorum], nil
 }
 
 func (up *UnbondingPipeline) requestSigFromCovenant(req *SignRequest, resultChan chan *SignResult) {
