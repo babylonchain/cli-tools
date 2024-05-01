@@ -76,10 +76,15 @@ func (c *BtcClient) SendTx(tx *wire.MsgTx) (*chainhash.Hash, error) {
 	return c.rpcClient.SendRawTransaction(tx, true)
 }
 
+// CheckTxOutSpendable checks whether the tx output has been spent
 func (c *BtcClient) CheckTxOutSpendable(txHash *chainhash.Hash, index uint32, mempool bool) (bool, error) {
-	_, err := c.rpcClient.GetTxOut(txHash, index, mempool)
+	res, err := c.rpcClient.GetTxOut(txHash, index, mempool)
 	if err != nil {
 		return false, err
+	}
+
+	if res == nil {
+		return false, nil
 	}
 
 	return true, nil
