@@ -35,7 +35,7 @@ func FuzzRemoteSignerConfig_Parse(f *testing.F) {
 				Urls: []string{
 					fmt.Sprintf("http://%s@127.0.0.1:%d", validPublicKey, validPort),
 				},
-				Timeout: validTimeout,
+				TimeoutSeconds: validTimeout,
 			},
 			expectedErr: false,
 		}
@@ -48,7 +48,7 @@ func FuzzRemoteSignerConfig_Parse(f *testing.F) {
 					fmt.Sprintf("http://%s@127.0.0.1:%d",
 						datagen.GenRandomHexStr(r, datagen.RandomInt(r, 100)+1), validPort),
 				},
-				Timeout: validTimeout,
+				TimeoutSeconds: validTimeout,
 			},
 			expectedErr: true,
 		}
@@ -61,7 +61,7 @@ func FuzzRemoteSignerConfig_Parse(f *testing.F) {
 					fmt.Sprintf("http:%s@127.0.0.1.1:%d",
 						validPublicKey, validPort),
 				},
-				Timeout: validTimeout,
+				TimeoutSeconds: validTimeout,
 			},
 			expectedErr: true,
 		}
@@ -73,7 +73,7 @@ func FuzzRemoteSignerConfig_Parse(f *testing.F) {
 				Urls: []string{
 					fmt.Sprintf("http://%s@127.0.0.1:%d", validPublicKey, validPort),
 				},
-				Timeout: 0,
+				TimeoutSeconds: 0,
 			},
 			expectedErr: true,
 		}

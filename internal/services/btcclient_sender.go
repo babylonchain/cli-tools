@@ -38,6 +38,7 @@ func (b *BtcClientSender) TxByHash(txHash *chainhash.Hash, pkScript []byte) (*Tx
 func (b *BtcClientSender) SendTx(tx *wire.MsgTx) (*chainhash.Hash, error) {
 	return b.client.SendTx(tx)
 }
+
 func (b *BtcClientSender) CheckTxOutSpendable(txHash *chainhash.Hash, index uint32, mempool bool) (bool, error) {
 	return b.client.CheckTxOutSpendable(txHash, index, mempool)
 }

@@ -60,7 +60,7 @@ network = "{{ .Btc.Network }}"
 # The list of signer urls in the format http://covenant_pk@signer_host:port
 urls = [{{ range .Signer.Urls }}{{ printf "%q, " . }}{{end}}]
 # The timeout of each request to the remote signing server
-timeout = {{ .Signer.Timeout }}
+timeout_seconds = {{ .Signer.TimeoutSeconds }}
 `
 
 var configTemplate *template.Template

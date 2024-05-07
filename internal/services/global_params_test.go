@@ -30,18 +30,19 @@ func generateInitParams(t *testing.T, r *rand.Rand) *services.VersionedGlobalPar
 	}
 
 	gp := services.VersionedGlobalParams{
-		Version:          0,
-		ActivationHeight: 0,
-		StakingCap:       uint64(r.Int63n(int64(initialCapMin)) + int64(initialCapMin)),
-		Tag:              tag,
-		CovenantPks:      pks,
-		CovenantQuorum:   uint64(quorum),
-		UnbondingTime:    uint64(r.Int63n(100) + 100),
-		UnbondingFee:     uint64(r.Int63n(100000) + 100000),
-		MaxStakingAmount: uint64(r.Int63n(100000000) + 100000000),
-		MinStakingAmount: uint64(r.Int63n(1000000) + 1000000),
-		MaxStakingTime:   math.MaxUint16,
-		MinStakingTime:   uint64(r.Int63n(10000) + 10000),
+		Version:           0,
+		ActivationHeight:  0,
+		StakingCap:        uint64(r.Int63n(int64(initialCapMin)) + int64(initialCapMin)),
+		Tag:               tag,
+		CovenantPks:       pks,
+		CovenantQuorum:    uint64(quorum),
+		UnbondingTime:     uint64(r.Int63n(100) + 100),
+		UnbondingFee:      uint64(r.Int63n(100000) + 100000),
+		MaxStakingAmount:  uint64(r.Int63n(100000000) + 100000000),
+		MinStakingAmount:  uint64(r.Int63n(1000000) + 1000000),
+		MaxStakingTime:    math.MaxUint16,
+		MinStakingTime:    uint64(r.Int63n(10000) + 10000),
+		ConfirmationDepth: uint64(r.Int63n(10) + 1),
 	}
 
 	return &gp
@@ -102,6 +103,7 @@ func FuzzParseValidParams(f *testing.F) {
 			require.Equal(t, globalParams.Versions[i].MinStakingAmount, uint64(p.MinStakingAmount))
 			require.Equal(t, globalParams.Versions[i].MaxStakingTime, uint64(p.MaxStakingTime))
 			require.Equal(t, globalParams.Versions[i].MinStakingTime, uint64(p.MinStakingTime))
+			require.Equal(t, globalParams.Versions[i].ConfirmationDepth, uint64(p.ConfirmationDepth))
 		}
 	})
 }

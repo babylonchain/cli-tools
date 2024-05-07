@@ -321,5 +321,3 @@ func (w *BtcClient) TxDetails(txHash *chainhash.Hash, pkScript []byte) (*notifie
 
 	return res, nofitierStateToClientState(state), nil
 }
-
-

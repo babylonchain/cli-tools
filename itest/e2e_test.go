@@ -254,8 +254,8 @@ func startSigningServer(
 		fmt.Sprintf("http://%s@%s:%d", covenantPksStr[1], host, port),
 	}
 	signerCfg := &config.RemoteSignerConfig{
-		Urls:    urlsStr,
-		Timeout: 10,
+		Urls:           urlsStr,
+		TimeoutSeconds: 10,
 	}
 
 	appConfig.Server.Host = host
