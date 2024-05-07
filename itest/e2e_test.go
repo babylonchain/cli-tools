@@ -255,7 +255,7 @@ func startSigningServer(
 	}
 	signerCfg := &config.RemoteSignerConfig{
 		Urls:    urlsStr,
-		Timeout: 10 * time.Second,
+		Timeout: 10,
 	}
 
 	appConfig.Server.Host = host

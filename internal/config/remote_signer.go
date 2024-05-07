@@ -12,7 +12,7 @@ import (
 const (
 	defaultHost    = "http://127.0.0.1"
 	defaultPort    = 9791
-	defaultTimeout = 2 * time.Second
+	defaultTimeout = 2
 )
 
 var (
@@ -22,8 +22,9 @@ var (
 )
 
 type RemoteSignerConfig struct {
-	Urls    []string      `mapstructure:"urls"` // in the format http://covenant_pk@signer_host:port
-	Timeout time.Duration `mapstructure:"timeout"`
+	Urls []string `mapstructure:"urls"` // in the format http://covenant_pk@signer_host:port
+	// timeout in seconds
+	Timeout int `mapstructure:"timeout"`
 }
 
 type ParsedRemoteSignerConfig struct {
@@ -68,7 +69,7 @@ func (c *RemoteSignerConfig) Parse() (*ParsedRemoteSignerConfig, error) {
 	return &ParsedRemoteSignerConfig{
 		Urls:       urls,
 		PublicKeys: publicKeys,
-		Timeout:    c.Timeout,
+		Timeout:    time.Duration(c.Timeout) * time.Second,
 	}, nil
 }
 

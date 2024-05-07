@@ -19,6 +19,6 @@ network = "regtest"
 
 [remote-signer-config]
 # The list of signer urls in the format http://covenant_pk@signer_host:port
-urls = ["http://03f39f3ac2a85285fa821ac2bb8e50d9110decb624ff42b6af1ab8d6da902b75ca@http://127.0.0.1:9791", ]
+urls = ["http://031bec6f65f3226e4a7b844973369686e576993db6579b5308057e177f2f5ee78e@http://127.0.0.1:9791", ]
 # The timeout of each request to the remote signing server
-timeout = 2s
+timeout = 2

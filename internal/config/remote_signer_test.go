@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/babylonchain/babylon/testutil/datagen"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -28,7 +27,7 @@ func FuzzRemoteSignerConfig_Parse(f *testing.F) {
 		require.NoError(t, err)
 		validPublicKey := hex.EncodeToString(sk.PubKey().SerializeCompressed())
 		validPort := 9321
-		validTimeout := 1 * time.Second
+		validTimeout := 1
 
 		case1 := &testCase{
 			name: "valid url",
