@@ -30,19 +30,19 @@ func init() {
 	// It is important that staking tx is already funded ie. has inputs. Othersie
 	// parsing it wil fail
 	createUnbondingTxCmd.Flags().String(FlagStakingTxHex, "", "funded staking tx hex")
-	createUnbondingTxCmd.MarkFlagRequired(FlagStakingTxHex)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagStakingTxHex)
 	createUnbondingTxCmd.Flags().String(FlagMagicBytes, "", "magic bytes")
-	createUnbondingTxCmd.MarkFlagRequired(FlagMagicBytes)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagMagicBytes)
 	createUnbondingTxCmd.Flags().Int64(FlagUnbondingTime, 0, "unbonding time")
-	createUnbondingTxCmd.MarkFlagRequired(FlagUnbondingTime)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagUnbondingTime)
 	createUnbondingTxCmd.Flags().Int64(FlagUnbondingTxFee, 0, "unbonding fee")
-	createUnbondingTxCmd.MarkFlagRequired(FlagUnbondingTxFee)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagUnbondingTxFee)
 	createUnbondingTxCmd.Flags().StringSlice(FlagCovenantCommitteePks, nil, "covenant committee pks")
-	createUnbondingTxCmd.MarkFlagRequired(FlagCovenantCommitteePks)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagCovenantCommitteePks)
 	createUnbondingTxCmd.Flags().Int64(FlagCovenantQuorum, 0, "covenant quorum")
-	createUnbondingTxCmd.MarkFlagRequired(FlagCovenantQuorum)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagCovenantQuorum)
 	createUnbondingTxCmd.Flags().String(FlagNetwork, "", "network one of (mainnet, testnet3, regtest, simnet, signet)")
-	createUnbondingTxCmd.MarkFlagRequired(FlagNetwork)
+	_ = createUnbondingTxCmd.MarkFlagRequired(FlagNetwork)
 
 	// If those flags are provided we will sign the unbonding tx with staker wallet
 	createUnbondingTxCmd.Flags().String(FlagStakerWalletAddressHost, "", "staker wallet address host")

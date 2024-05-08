@@ -10,7 +10,6 @@ import (
 	"github.com/babylonchain/babylon/btcstaking"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -136,13 +135,13 @@ func getBtcNetworkParams(network string) (*chaincfg.Params, error) {
 	}
 }
 
-func parseSchnorPubKeyFromHex(pkHex string) (*btcec.PublicKey, error) {
+func parsePubKeyFromHex(pkHex string) (*btcec.PublicKey, error) {
 	pkBytes, err := hex.DecodeString(pkHex)
 	if err != nil {
 		return nil, err
 	}
 
-	pk, err := schnorr.ParsePubKey(pkBytes)
+	pk, err := btcec.ParsePubKey(pkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -154,17 +153,12 @@ func parseCovenantKeysFromSlice(covenantMembersPks []string) ([]*btcec.PublicKey
 	covenantPubKeys := make([]*btcec.PublicKey, len(covenantMembersPks))
 
 	for i, fpPk := range covenantMembersPks {
-		fpPkBytes, err := hex.DecodeString(fpPk)
+		covPk, err := parsePubKeyFromHex(fpPk)
+
 		if err != nil {
 			return nil, err
 		}
-
-		fpSchnorrKey, err := schnorr.ParsePubKey(fpPkBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		covenantPubKeys[i] = fpSchnorrKey
+		covenantPubKeys[i] = covPk
 	}
 
 	return covenantPubKeys, nil
@@ -221,21 +215,21 @@ type CreateStakingTxResp struct {
 
 func init() {
 	createStakingTxCmd.Flags().String(FlagMagicBytes, "", "magic bytes")
-	createStakingTxCmd.MarkFlagRequired(FlagMagicBytes)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagMagicBytes)
 	createStakingTxCmd.Flags().String(FlagStakerPk, "", "staker pk")
-	createStakingTxCmd.MarkFlagRequired(FlagStakerPk)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagStakerPk)
 	createStakingTxCmd.Flags().String(FlagFinalityProviderPk, "", "finality provider pk")
-	createStakingTxCmd.MarkFlagRequired(FlagFinalityProviderPk)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagFinalityProviderPk)
 	createStakingTxCmd.Flags().Int64(FlagStakingAmount, 0, "staking amount")
-	createStakingTxCmd.MarkFlagRequired(FlagStakingAmount)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagStakingAmount)
 	createStakingTxCmd.Flags().Int64(FlagStakingTime, 0, "staking time")
-	createStakingTxCmd.MarkFlagRequired(FlagStakingTime)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagStakingTime)
 	createStakingTxCmd.Flags().StringSlice(FlagCovenantCommitteePks, nil, "covenant committee pks")
-	createStakingTxCmd.MarkFlagRequired(FlagCovenantCommitteePks)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagCovenantCommitteePks)
 	createStakingTxCmd.Flags().Int64(FlagCovenantQuorum, 0, "covenant quorum")
-	createStakingTxCmd.MarkFlagRequired(FlagCovenantQuorum)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagCovenantQuorum)
 	createStakingTxCmd.Flags().String(FlagNetwork, "", "network one of (mainnet, testnet3, regtest, simnet, signet)")
-	createStakingTxCmd.MarkFlagRequired(FlagNetwork)
+	_ = createStakingTxCmd.MarkFlagRequired(FlagNetwork)
 
 	rootCmd.AddCommand(createStakingTxCmd)
 }
@@ -256,13 +250,13 @@ var createStakingTxCmd = &cobra.Command{
 			return err
 		}
 
-		stakerPk, err := parseSchnorPubKeyFromHex(mustGetStringFlag(cmd, FlagStakerPk))
+		stakerPk, err := parsePubKeyFromHex(mustGetStringFlag(cmd, FlagStakerPk))
 
 		if err != nil {
 			return err
 		}
 
-		finalityProviderPk, err := parseSchnorPubKeyFromHex(mustGetStringFlag(cmd, FlagFinalityProviderPk))
+		finalityProviderPk, err := parsePubKeyFromHex(mustGetStringFlag(cmd, FlagFinalityProviderPk))
 
 		if err != nil {
 			return err

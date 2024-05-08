@@ -23,19 +23,19 @@ func init() {
 	// It is important that staking tx is already funded ie. has inputs. Othersie
 	// parsing it wil fail
 	createWithdrawCmd.Flags().String(FlagStakingTxHex, "", "funded staking tx hex")
-	createWithdrawCmd.MarkFlagRequired(FlagStakingTxHex)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagStakingTxHex)
 	createWithdrawCmd.Flags().String(FlagMagicBytes, "", "magic bytes")
-	createWithdrawCmd.MarkFlagRequired(FlagMagicBytes)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagMagicBytes)
 	createWithdrawCmd.Flags().Int64(FlagWithdrawTxFee, 0, "withdraw fee")
-	createWithdrawCmd.MarkFlagRequired(FlagWithdrawTxFee)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagWithdrawTxFee)
 	createWithdrawCmd.Flags().StringSlice(FlagCovenantCommitteePks, nil, "covenant committee pks")
-	createWithdrawCmd.MarkFlagRequired(FlagCovenantCommitteePks)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagCovenantCommitteePks)
 	createWithdrawCmd.Flags().Int64(FlagCovenantQuorum, 0, "covenant quorum")
-	createWithdrawCmd.MarkFlagRequired(FlagCovenantQuorum)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagCovenantQuorum)
 	createWithdrawCmd.Flags().String(FlagWithdrawTxDestination, "", "withdraw tx destination")
-	createWithdrawCmd.MarkFlagRequired(FlagWithdrawTxDestination)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagWithdrawTxDestination)
 	createWithdrawCmd.Flags().String(FlagNetwork, "", "network one of (mainnet, testnet3, regtest, simnet, signet)")
-	createWithdrawCmd.MarkFlagRequired(FlagNetwork)
+	_ = createWithdrawCmd.MarkFlagRequired(FlagNetwork)
 
 	createWithdrawCmd.Flags().String(FlagUnbondingTxHex, "", "unbonding tx hex. If set, we will build withdraw tx from unbodning tx.")
 	// This need to be set to correct value if want to withdraw from unbonding tx, otherwise tx will
