@@ -541,20 +541,20 @@ func TestReSendingFailedTransactions(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, alreadySend, 0)
 
-	// 4. Run pipeline
+	// 2. Run pipeline
 	err = m.pipeLine.ProcessNewTransactions(context.Background())
 	require.NoError(t, err)
 
-	// 5. There should be one failed transaction
+	// 3. There should be one failed transaction
 	failedTx, err := m.testStoreController.GetFailedUnbondingTransactions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, failedTx, 1)
 
-	// 6. Fix sig in db
+	// 4. Fix sig in db
 	unbondingTxHash := unbondingTx.unbondingTx.TxHash()
 	m.updateSchnorSigInDb(unbondingTx.signature, &unbondingTxHash)
 
-	// 7. Run pipeline for failed tx
+	// 5. Run pipeline for failed tx
 	err = m.pipeLine.ProcessFailedTransactions(context.Background())
 	require.NoError(t, err)
 
