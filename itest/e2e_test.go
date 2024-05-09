@@ -164,7 +164,7 @@ func StartManager(
 
 	err = client.UnlockWallet(60*60*60, passphrase)
 	require.NoError(t, err)
-	stakerPrivKey, err := client.DumpPrivateKey(walletAddress)
+	stakerPrivKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
 	fpKey, err := btcec.NewPrivateKey()
@@ -267,8 +267,7 @@ func startSigningServer(
 
 	// In e2e test we are using the same node for signing as for indexing functionalities
 	chainInfo := signerapp.NewBitcoindChainInfo(client)
-	// TODO: Use signer with psbt, this require some changes in tests
-	signer := signerapp.NewPrivKeySigner(client)
+	signer := signerapp.NewPsbtSigner(client)
 
 	signerGlobalParams := signerapp.ParsedGlobalParams{
 		Versions: []*signerapp.ParsedVersionedGlobalParams{
