@@ -15,6 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	FlagTxFee = "tx-fee"
+)
+
 type TimestampFileOutput struct {
 	TimestampTx string `json:"timestamp_tx_hex"`
 	PkTapRoot   string `json:"pk_tap_root"`
@@ -22,6 +26,8 @@ type TimestampFileOutput struct {
 }
 
 func init() {
+	btcTimestampFileCmd.Flags().Int64(FlagTxFee, 100, "unbonding fee")
+
 	rootCmd.AddCommand(btcTimestampFileCmd)
 }
 
@@ -64,9 +70,19 @@ var btcTimestampFileCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("unable to parse public key %s: %w", pubKeyHex, err)
 		}
-		pkTapRoot := txscript.ComputeTaprootKeyNoScript(schnorrPk)
-		taprootPkScript := pkTapRoot.SerializeCompressed()
-		txPk := wire.NewTxOut(0, taprootPkScript)
+
+		tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
+		taprootPkScript, err := txscript.PayToTaprootScript(tapRootKey)
+		if err != nil {
+			return fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
+		}
+
+		txFee, err := parseBtcAmount(mustGetInt64Flag(cmd, FlagTxFee))
+		if err != nil {
+			return err
+		}
+
+		txPk := wire.NewTxOut(int64(txFee), taprootPkScript)
 
 		tx := wire.NewMsgTx(2)
 		tx.AddTxOut(txPk)
