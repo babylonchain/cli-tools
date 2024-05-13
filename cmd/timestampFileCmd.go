@@ -65,8 +65,8 @@ var btcTimestampFileCmd = &cobra.Command{
 			return fmt.Errorf("unable to parse public key %s: %w", pubKeyHex, err)
 		}
 		pkTapRoot := txscript.ComputeTaprootKeyNoScript(schnorrPk)
-		bzPkTapRoot := pkTapRoot.SerializeCompressed()
-		txPk := wire.NewTxOut(0, bzPkTapRoot)
+		taprootPkScript := pkTapRoot.SerializeCompressed()
+		txPk := wire.NewTxOut(0, taprootPkScript)
 
 		tx := wire.NewMsgTx(2)
 		tx.AddTxOut(txPk)
@@ -79,7 +79,7 @@ var btcTimestampFileCmd = &cobra.Command{
 
 		PrintRespJSON(TimestampFileOutput{
 			TimestampTx: txHex,
-			PkTapRoot:   hex.EncodeToString(bzPkTapRoot),
+			PkTapRoot:   hex.EncodeToString(taprootPkScript),
 			FileHash:    hex.EncodeToString(fileHash),
 		})
 		return nil
