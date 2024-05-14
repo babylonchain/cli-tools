@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	bbntypes "github.com/babylonchain/babylon/types"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -19,6 +20,11 @@ const (
 	FlagTxFee = "tx-fee"
 )
 
+type TimestampAcc struct {
+	AccTx      string `json:"acc_tx_hex"`
+	TaprootAcc string `json:"taproot_acc_hex"`
+}
+
 type TimestampFileOutput struct {
 	TimestampTx string `json:"timestamp_tx_hex"`
 	PkTapRoot   string `json:"pk_tap_root"`
@@ -29,6 +35,7 @@ func init() {
 	btcTimestampFileCmd.Flags().Int64(FlagTxFee, 100, "unbonding fee")
 
 	rootCmd.AddCommand(btcTimestampFileCmd)
+	rootCmd.AddCommand(btcCreateTimestampAcc)
 }
 
 var btcTimestampFileCmd = &cobra.Command{
@@ -97,6 +104,60 @@ var btcTimestampFileCmd = &cobra.Command{
 			TimestampTx: txHex,
 			PkTapRoot:   hex.EncodeToString(taprootPkScript),
 			FileHash:    hex.EncodeToString(fileHash),
+		})
+		return nil
+	},
+}
+
+var btcCreateTimestampAcc = &cobra.Command{
+	Use:     "crate-timestamp-account [value] [pub-key-hex]",
+	Example: `cli-tools crate-timestamp-account 100000 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
+	Short: `Creates a timestamp btc account computed from the pub key by computing
+the taproot key with no script (ComputeTaprootKeyNoScript) and send the [value] 
+amount to it.`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		amountToSendStr := args[0]
+		amountToSend, err := strconv.ParseInt(amountToSendStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid amount %s: %w", amountToSendStr, err)
+		}
+
+		pubKeyHex := args[1]
+		pubkey, err := bbntypes.NewBIP340PubKeyFromHex(pubKeyHex)
+		if err != nil {
+			return fmt.Errorf("invalid public key %s: %w", pubKeyHex, err)
+		}
+
+		schnorrPk, err := schnorr.ParsePubKey(*pubkey)
+		if err != nil {
+			return fmt.Errorf("unable to parse public key %s: %w", pubKeyHex, err)
+		}
+
+		tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
+		taprootPkScript, err := txscript.PayToTaprootScript(tapRootKey)
+		if err != nil {
+			return fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
+		}
+
+		valueToSend, err := parseBtcAmount(amountToSend)
+		if err != nil {
+			return err
+		}
+
+		txNewPk := wire.NewTxOut(int64(valueToSend), taprootPkScript)
+
+		tx := wire.NewMsgTx(2)
+		tx.AddTxOut(txNewPk)
+
+		txHex, err := serializeBTCTxToHex(tx)
+		if err != nil {
+			return fmt.Errorf("failed to serialize timestamping tx: %w", err)
+		}
+
+		PrintRespJSON(TimestampAcc{
+			AccTx:      txHex,
+			TaprootAcc: hex.EncodeToString(taprootPkScript),
 		})
 		return nil
 	},
