@@ -3,7 +3,6 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,112 +31,90 @@ type TimestampFileOutput struct {
 }
 
 func init() {
-	btcTimestampFileCmd.Flags().Int64(FlagTxFee, 100, "unbonding fee")
-
-	rootCmd.AddCommand(btcTimestampFileCmd)
 	rootCmd.AddCommand(btcCreateTimestampAcc)
+	rootCmd.AddCommand(btcTimestampFileCmd)
 }
 
 var btcTimestampFileCmd = &cobra.Command{
-	Use:     "btc-timestamp-file [file-path] [pub-key-hex]",
-	Example: `cli-tools btc-timestamp-file ./path/to/file/to/timestamp 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
+	Use:     "create-timestamp-transaction [previous-timestamp-tx] [file-path] [pub-key-hex]",
+	Example: `cli-tools btc-timestamp-file [funded-tx-hex] ./path/to/file/to/timestamp 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
 	Short:   "Creates a timestamp btc transaction by hashing the file input.",
 	Long: `Creates a timestamp BTC transaction with 2 outputs.
-	The first output is the taproot output which can be spend only by the
-	keyspend path. The taproot output key is defined as the babylon secp256k1 pub key
-	+ txscript.ComputeTaprootKeyNoScript(pubKey).
-	The second output read the file received as argument, hash it with
-	sha256 to have 32 byte hash with zero value.`,
-	Args: cobra.ExactArgs(2),
+	The first output is the nullDataScript of the file hash, as the file hash
+	being the sha256 of the input file path. This first output is the timestamp of the file.
+	The second output is the taproot derived from the pubkey with ComputeTaprootKeyNoScript
+	and PayToTaprootScript with the value as ({funded-tx-output} - {fees}). The second
+	output is needed to continue to have spendable funds to the taproot pk.`,
+	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		inputFilePath := args[0]
-		if len(inputFilePath) == 0 {
-			return errors.New("invalid argument, please provide a valid file path as input argument")
-		}
-
-		fileHash, err := hashFromFile(inputFilePath)
+		fundedTxHex, inputFilePath, pubKeyHexStr := args[0], args[1], args[2]
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr)
 		if err != nil {
-			return fmt.Errorf("failed to generate hash from file %s: %w", inputFilePath, err)
+			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
 
-		dataScript, err := txscript.NullDataScript(fileHash)
-		if err != nil {
-			return fmt.Errorf("failed to create op return with hash from file %s: %w", fileHash, err)
-		}
-
-		txOutFileHash := wire.NewTxOut(0, dataScript)
-
-		pubKeyHex := args[1]
-		pubkey, err := bbntypes.NewBIP340PubKeyFromHex(pubKeyHex)
-		if err != nil {
-			return fmt.Errorf("invalid public key %s: %w", pubKeyHex, err)
-		}
-
-		schnorrPk, err := schnorr.ParsePubKey(*pubkey)
-		if err != nil {
-			return fmt.Errorf("unable to parse public key %s: %w", pubKeyHex, err)
-		}
-
-		tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
-		taprootPkScript, err := txscript.PayToTaprootScript(tapRootKey)
-		if err != nil {
-			return fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
-		}
-
-		txFee, err := parseBtcAmount(mustGetInt64Flag(cmd, FlagTxFee))
-		if err != nil {
-			return err
-		}
-
-		txPk := wire.NewTxOut(int64(txFee), taprootPkScript)
-
-		tx := wire.NewMsgTx(2)
-		tx.AddTxOut(txPk)
-		tx.AddTxOut(txOutFileHash)
-
-		txHex, err := serializeBTCTxToHex(tx)
-		if err != nil {
-			return fmt.Errorf("failed to serialize timestamping tx: %w", err)
-		}
-
-		PrintRespJSON(TimestampFileOutput{
-			TimestampTx: txHex,
-			PkTapRoot:   hex.EncodeToString(taprootPkScript),
-			FileHash:    hex.EncodeToString(fileHash),
-		})
+		PrintRespJSON(timestampOutput)
 		return nil
 	},
+}
+
+func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string) (*TimestampFileOutput, error) {
+	txOutFileHash, fileHash, err := txOutTimestampFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create tx out with filepath %s: %w", filePath, err)
+	}
+
+	taprootPkScript, err := deriveTaprootPkScript(pubKeyHexStr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
+	}
+
+	// TODO: generate value from outputs of fundedTxHex
+	txOutPk := wire.NewTxOut(int64(0), taprootPkScript)
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxOut(txOutPk)
+	tx.AddTxOut(txOutFileHash)
+
+	txHex, err := serializeBTCTxToHex(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize timestamping tx: %w", err)
+	}
+
+	return &TimestampFileOutput{
+		TimestampTx: txHex,
+		PkTapRoot:   hex.EncodeToString(taprootPkScript),
+		FileHash:    hex.EncodeToString(fileHash),
+	}, nil
+}
+
+func deriveTaprootPkScript(pubKeyHexStr string) ([]byte, error) {
+	pubkey, err := bbntypes.NewBIP340PubKeyFromHex(pubKeyHexStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid public key %s: %w", pubKeyHexStr, err)
+	}
+
+	schnorrPk, err := schnorr.ParsePubKey(*pubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse public key %s: %w", pubKeyHexStr, err)
+	}
+
+	tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
+	return txscript.PayToTaprootScript(tapRootKey)
 }
 
 var btcCreateTimestampAcc = &cobra.Command{
 	Use:     "crate-timestamp-account [value] [pub-key-hex]",
 	Example: `cli-tools crate-timestamp-account 100000 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
 	Short: `Creates a timestamp btc account computed from the pub key by computing
-the taproot key with no script (ComputeTaprootKeyNoScript) and send the [value] 
+the taproot key with no script (ComputeTaprootKeyNoScript) and send the [value]
 amount to it.`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		amountToSendStr := args[0]
+		amountToSendStr, pubKeyHexStr := args[0], args[1]
 		amountToSend, err := strconv.ParseInt(amountToSendStr, 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid amount %s: %w", amountToSendStr, err)
-		}
-
-		pubKeyHex := args[1]
-		pubkey, err := bbntypes.NewBIP340PubKeyFromHex(pubKeyHex)
-		if err != nil {
-			return fmt.Errorf("invalid public key %s: %w", pubKeyHex, err)
-		}
-
-		schnorrPk, err := schnorr.ParsePubKey(*pubkey)
-		if err != nil {
-			return fmt.Errorf("unable to parse public key %s: %w", pubKeyHex, err)
-		}
-
-		tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
-		taprootPkScript, err := txscript.PayToTaprootScript(tapRootKey)
-		if err != nil {
-			return fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
 		}
 
 		valueToSend, err := parseBtcAmount(amountToSend)
@@ -145,10 +122,13 @@ amount to it.`,
 			return err
 		}
 
-		txNewPk := wire.NewTxOut(int64(valueToSend), taprootPkScript)
+		taprootPkScript, err := deriveTaprootPkScript(pubKeyHexStr)
+		if err != nil {
+			return fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
+		}
 
 		tx := wire.NewMsgTx(2)
-		tx.AddTxOut(txNewPk)
+		tx.AddTxOut(wire.NewTxOut(int64(valueToSend), taprootPkScript))
 
 		txHex, err := serializeBTCTxToHex(tx)
 		if err != nil {
@@ -163,12 +143,26 @@ amount to it.`,
 	},
 }
 
-func hashFromFile(inputFilePath string) ([]byte, error) {
+func txOutTimestampFile(filePath string) (txOut *wire.TxOut, fileHash []byte, err error) {
+	fileHash, err = hashFromFile(filePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate hash from file %s: %w", filePath, err)
+	}
+
+	dataScript, err := txscript.NullDataScript(fileHash)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create op return with hash from file %s: %w", fileHash, err)
+	}
+
+	return wire.NewTxOut(0, dataScript), fileHash, nil
+}
+
+func hashFromFile(filePath string) ([]byte, error) {
 	h := sha256.New()
 
-	f, err := os.Open(inputFilePath)
+	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open the file %s: %w", inputFilePath, err)
+		return nil, fmt.Errorf("failed to open the file %s: %w", filePath, err)
 	}
 	defer f.Close()
 
