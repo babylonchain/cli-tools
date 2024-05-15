@@ -168,6 +168,13 @@ func (h *BitcoindTestHandler) SignRawTxWithWallet(rpcWallet, fundedRawTxHex stri
 	return result
 }
 
+func (h *BitcoindTestHandler) WalletPassphrase(rpcWallet, passphrase string) string {
+	cmd := []string{fmt.Sprintf("-rpcwallet=%s", rpcWallet), "walletpassphrase", passphrase}
+	buff, _, err := h.m.ExecBitcoindCliCmd(h.t, cmd)
+	require.NoError(h.t, err)
+	return buff.String()
+}
+
 func (h *BitcoindTestHandler) SendRawTx(rpcWallet, fundedSignedTxHex string) string {
 	cmd := []string{fmt.Sprintf("-rpcwallet=%s", rpcWallet), "sendrawtransaction", fundedSignedTxHex}
 	buff, _, err := h.m.ExecBitcoindCliCmd(h.t, cmd)

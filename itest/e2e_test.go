@@ -460,12 +460,13 @@ func (tm *TestManager) createNUnbondingTransactions(n int, d *stakingData) ([]*u
 
 func TestBtcTimestamp(t *testing.T) {
 	tm := StartManager(t, 10, false)
+	btcd := tm.bitcoindHandler
 
 	btcTimestampWalletName := "btc-file-timestamping"
-	resp := tm.bitcoindHandler.CreateWallet(btcTimestampWalletName, passphrase)
+	resp := btcd.CreateWallet(btcTimestampWalletName, passphrase)
 	require.Equal(t, btcTimestampWalletName, resp.Name)
 
-	newAddr := tm.bitcoindHandler.GetNewAddress(btcTimestampWalletName)
+	newAddr := btcd.GetNewAddress(btcTimestampWalletName)
 	require.NotEmpty(t, newAddr)
 	fmt.Printf("\n New Addr %s\n", newAddr.String())
 	// netParams
@@ -477,12 +478,12 @@ func TestBtcTimestamp(t *testing.T) {
 	// err := tm.btcClient.UnlockWallet(60, tm.walletPass)
 	// require.NoError(t, err)
 
-	tm.bitcoindHandler.SendToAddress(FundWalletName, newAddr.String(), "15")
-	tm.bitcoindHandler.GenerateBlocks(5)
-	unspentTxt := tm.bitcoindHandler.ListUnspent(btcTimestampWalletName)
+	btcd.SendToAddress(FundWalletName, newAddr.String(), "15")
+	btcd.GenerateBlocks(5)
+	unspentTxt := btcd.ListUnspent(btcTimestampWalletName)
 	fmt.Printf("\nunspentTxt: %s", unspentTxt)
 
-	addrInfo := tm.bitcoindHandler.GetAddressInfo(btcTimestampWalletName, newAddr.String())
+	addrInfo := btcd.GetAddressInfo(btcTimestampWalletName, newAddr.String())
 	require.Equal(t, newAddr.String(), addrInfo.Address)
 	require.NotNil(t, addrInfo.PubKey)
 
@@ -490,14 +491,15 @@ func TestBtcTimestamp(t *testing.T) {
 	require.Greater(t, len(pubKeyStr), 2)
 	pubKeyHex := pubKeyStr[2:]
 
-	timestampAcc, err := cmd.CreateTimestampAcc("14", pubKeyHex)
+	timestampAcc, err := cmd.CreateTimestampAcc("15000000", pubKeyHex)
 	require.NoError(t, err)
 
-	fundedTx := tm.bitcoindHandler.FundRawTx(btcTimestampWalletName, timestampAcc.AccTx)
-
+	fundedTx := btcd.FundRawTx(btcTimestampWalletName, timestampAcc.AccTx)
 	fundedTxHex, err := cmd.SerializeBTCTxToHex(fundedTx.Transaction)
 	require.NoError(t, err)
-	tm.bitcoindHandler.SignRawTxWithWallet(btcTimestampWalletName, fundedTxHex)
+
+	btcd.WalletPassphrase(btcTimestampWalletName, passphrase)
+	btcd.SignRawTxWithWallet(btcTimestampWalletName, fundedTxHex)
 
 	// cmd.CreateTimestampTx()
 	// amountToSend := int64(2500)
