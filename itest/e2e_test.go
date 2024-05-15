@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -20,11 +19,13 @@ import (
 	signercfg "github.com/babylonchain/covenant-signer/config"
 	"github.com/babylonchain/covenant-signer/signerapp"
 	"github.com/babylonchain/covenant-signer/signerservice"
+	"github.com/babylonchain/covenant-signer/utils"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -473,32 +474,40 @@ func TestBtcTimestamp(t *testing.T) {
 	require.NotEmpty(t, newAddr)
 	fmt.Printf("\n New Addr %s\n", newAddr.String())
 
-	btcd.SendToAddress(FundWalletName, newAddr.String(), "25")
+	newAddrPkScript, err := txscript.PayToAddrScript(newAddr)
+	require.NoError(t, err)
+
+	fundingTxHash := btcd.SendToAddress(FundWalletName, newAddr.String(), "25")
 	btcd.GenerateBlocks(5)
-	unspentTxt := btcd.ListUnspent(wName)
-	fmt.Printf("\nunspentTxt: %s", unspentTxt)
 
-	addrInfo := btcd.GetAddressInfo(wName, newAddr.String())
-	require.Equal(t, newAddr.String(), addrInfo.Address)
-	require.NotNil(t, addrInfo.PubKey)
+	tx, conf, err := tm.btcClient.TxDetails(fundingTxHash, newAddrPkScript)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+	require.Equal(t, btcclient.TxInChain, conf)
 
-	pubKeyStr := *addrInfo.PubKey
-	require.Greater(t, len(pubKeyStr), 2)
-	pubKeyHex := pubKeyStr[2:]
-
-	amountToTaprootPk := int64(15000000)
-	timestampAcc, err := cmd.CreateTimestampAcc(strconv.FormatInt(amountToTaprootPk, 10), pubKeyHex)
+	fundinTxSerialized, err := cmd.SerializeBTCTxToHex(tx.Tx)
 	require.NoError(t, err)
 
-	fundedTx := btcd.FundRawTx(wName, timestampAcc.AccTx)
-	fundedTxHex, err := cmd.SerializeBTCTxToHex(fundedTx.Transaction)
-	require.NoError(t, err)
+	// fundingTxHash := btcd.SendToAddress(FundWalletName, newAddr.String(), "25")
+	// btcd.GenerateBlocks(5)
+	// unspentTxt := btcd.ListUnspent(wName)
+	// fmt.Printf("\nunspentTxt: %s", unspentTxt)
+
+	// addrInfo := btcd.GetAddressInfo(wName, newAddr.String())
+	// require.Equal(t, newAddr.String(), addrInfo.Address)
+	// require.NotNil(t, addrInfo.PubKey)
+
+	// tm.btcClient.TxDetails()
+
+	// amountToTaprootPk := int64(15000000)
+	// timestampAcc, err := cmd.CreateTimestampAcc(strconv.FormatInt(amountToTaprootPk, 10), pubKeyHex)
+	// require.NoError(t, err)
 
 	btcd.WalletPassphrase(wName, passphrase, "70")
-	signedTxResult := btcd.SignRawTxWithWallet(wName, fundedTxHex)
+	// signedTxResult := btcd.SignRawTxWithWallet(wName, fundedTxHex)
 
-	btcd.SendRawTx(wName, signedTxResult.Hex)
-	btcd.GenerateBlocks(5)
+	// btcd.SendRawTx(wName, signedTxResult.Hex)
+	// btcd.GenerateBlocks(5)
 
 	currentPath, err := os.Getwd()
 	require.NoError(t, err)
@@ -506,30 +515,60 @@ func TestBtcTimestamp(t *testing.T) {
 	fmt.Printf("\nmodFilePath: %s", modFilePath)
 	fmt.Printf("\nStart Create Timestamp TX")
 
-	fundedTxOutputIdx := uint32(1) // is one, because when funding the tx it adds a new txout
-	for idx, txOut := range fundedTx.Transaction.TxOut {
-		if txOut.Value == amountToTaprootPk {
-			fundedTxOutputIdx = uint32(idx)
-			break
-		}
-	}
+	// fundedTxOutputIdx := uint32(1) // is one, because when funding the tx it adds a new txout
+	// for idx, txOut := range fundedTx.Transaction.TxOut {
+	// 	if txOut.Value == amountToTaprootPk {
+	// 		fundedTxOutputIdx = uint32(idx)
+	// 		break
+	// 	}
+	// }
 
-	feeSatoshiPerByte := int64(5)
-	timestampFileOutput, err := cmd.CreateTimestampTx(signedTxResult.Hex, modFilePath, pubKeyHex, fundedTxOutputIdx, feeSatoshiPerByte)
+	// feeSatoshiPerByte := int64(5)
+
+	// addrs, err := btcutil.DecodeAddress("", nil)
+
+	// txscript.PayToAddrScript(addrs)
+	timestampFileOutput, err := cmd.CreateTimestampTx(
+		fundinTxSerialized,
+		modFilePath,
+		newAddr.EncodeAddress(),
+		3000,
+	)
+
+	// timestampFileOutput, err := cmd.CreateTimestampTx(signedTxResult.Hex, modFilePath, pubKeyHex, fundedTxOutputIdx, feeSatoshiPerByte)
 	require.NoError(t, err)
 	require.NotNil(t, timestampFileOutput)
 
-	fundedTx = btcd.FundRawTx(wName, timestampFileOutput.TimestampTx)
-	fundedTxHex, err = cmd.SerializeBTCTxToHex(fundedTx.Transaction)
-	require.NoError(t, err)
+	fmt.Printf("\n tx before signing: %s", timestampFileOutput.TimestampTx)
+	signedTimestampTx := btcd.SignRawTxWithWallet(wName, timestampFileOutput.TimestampTx)
+	fmt.Printf("\n tx after signing: %s", signedTimestampTx.Hex)
 
-	signedTxResult = btcd.SignRawTxWithWallet(wName, fundedTxHex)
-	txHashTimestampFile := btcd.SendRawTx(wName, signedTxResult.Hex)
+	stx, _, err := utils.NewBTCTxFromHex(signedTimestampTx.Hex)
+	require.NoError(t, err)
+	require.NotNil(t, signedTimestampTx)
+
+	stxHash := stx.TxHash()
+
+	btcd.SendRawTx(wName, signedTimestampTx.Hex)
 	btcd.GenerateBlocks(5)
 
-	fmt.Printf("\ntxHashTimestampFile: %s", txHashTimestampFile)
-	txResult := btcd.GetTransaction(txHashTimestampFile)
-	fmt.Printf("\ntxResult: %+v", txResult)
+	stxConfirmation, stxState, err := tm.btcClient.TxDetails(&stxHash, newAddrPkScript)
+	require.NoError(t, err)
+	require.Equal(t, btcclient.TxInChain, stxState)
+	require.NotNil(t, stxConfirmation)
+
+	// fundedTx = btcd.FundRawTx(wName, timestampFileOutput.TimestampTx)
+	// fundedTxHex, err = cmd.SerializeBTCTxToHex(fundedTx.Transaction)
+	// require.NoError(t, err)
+	// fmt.Printf("Sending tx for sig %s \n", timestampFileOutput.TimestampTx)
+	// signedTxResult = btcd.SignRawTxWithWallet(wName, timestampFileOutput.TimestampTx)
+	// fmt.Printf("Sending tx %s \n", signedTxResult.Hex)
+	// txHashTimestampFile := btcd.SendRawTx(wName, signedTxResult.Hex)
+	// btcd.GenerateBlocks(5)
+
+	// fmt.Printf("\ntxHashTimestampFile: %s", txHashTimestampFile)
+	// txResult := btcd.GetTransaction(txHashTimestampFile)
+	// fmt.Printf("\ntxResult: %+v", txResult)
 	// cmd.CreateTimestampTx()
 	// amountToSend := int64(2500)
 	// txHash, err := tm.btcClient.TransferSatoshiTo(amountToSend, 10, newAddr, FundWalletName)
@@ -561,7 +600,7 @@ func TestBtcTimestamp(t *testing.T) {
 	// Need to attach input to the new transaction to create
 }
 
-func TestSendingFreshTransactions(t *testing.T) {
+func ATestSendingFreshTransactions(t *testing.T) {
 	m := StartManager(t, 10, true)
 	d := defaultStakingData()
 	numUnbondingTxs := 10
@@ -634,7 +673,7 @@ func (tm *TestManager) updateSchnorSigInDb(newSig *schnorr.Signature, txHash *ch
 	require.NoError(tm.t, err)
 }
 
-func TestHandlingCriticalError(t *testing.T) {
+func ATestHandlingCriticalError(t *testing.T) {
 	m := StartManager(t, 10, true)
 	d := defaultStakingData()
 

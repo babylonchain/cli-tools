@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 
 	bbntypes "github.com/babylonchain/babylon/types"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/spf13/cobra"
@@ -53,17 +56,17 @@ var btcTimestampFileCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fundedTxHex, inputFilePath, pubKeyHexStr := args[0], args[1], args[2]
 
-		fundedTxOutputIdx, err := cmd.Flags().GetUint32(FlagFundedTxOutputIdx)
-		if err != nil {
-			return fmt.Errorf("failed to parse flag %s: %w", FlagFundedTxOutputIdx, err)
-		}
+		// fundedTxOutputIdx, err := cmd.Flags().GetUint32(FlagFundedTxOutputIdx)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to parse flag %s: %w", FlagFundedTxOutputIdx, err)
+		// }
 
-		feeSatoshiPerByte, err := cmd.Flags().GetInt64(FlagFeeSatoshiPerByte)
-		if err != nil {
-			return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
-		}
+		// feeSatoshiPerByte, err := cmd.Flags().GetInt64(FlagFeeSatoshiPerByte)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
+		// }
 
-		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, fundedTxOutputIdx, feeSatoshiPerByte)
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, 200)
 		if err != nil {
 			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
@@ -73,51 +76,74 @@ var btcTimestampFileCmd = &cobra.Command{
 	},
 }
 
-func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutputIdx uint32, feeSatoshiPerByte int64) (*TimestampFileOutput, error) {
+func outputIndexForPkScript(pkScript []byte, tx *wire.MsgTx) (int, error) {
+	for i, txOut := range tx.TxOut {
+		if bytes.Equal(txOut.PkScript, pkScript) {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("unable to find output index for pk script")
+}
+
+func CreateTimestampTx(
+	fundedTxHex, filePath, changeAddress string,
+	fee int64,
+) (*TimestampFileOutput, error) {
 	txOutFileHash, fileHash, err := txOutTimestampFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tx out with filepath %s: %w", filePath, err)
 	}
 
-	taprootPkScript, err := deriveTaprootPkScript(pubKeyHexStr)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
-	}
-
-	fundedTx, _, err := newBTCTxFromHex(fundedTxHex)
+	fundingTx, _, err := newBTCTxFromHex(fundedTxHex)
 	if err != nil {
 		return nil, fmt.Errorf("unable parse BTC Tx %s: %w", fundedTxHex, err)
 	}
-	fundedTxHash := fundedTx.TxHash()
-	fundedTxOutPoint := wire.NewOutPoint(&fundedTxHash, fundedTxOutputIdx)
-	txOutputAsInput := wire.NewTxIn(fundedTxOutPoint, nil, nil)
 
-	// TODO: refactory fee calc
-	totalIn := sumValues(fundedTx.TxOut[fundedTxOutputIdx])
+	address, err := btcutil.DecodeAddress(changeAddress, &chaincfg.RegressionNetParams)
 
-	tx := wire.NewMsgTx(2)
-	tx.AddTxIn(txOutputAsInput)
-
-	txOutPk := wire.NewTxOut(0, taprootPkScript)
-	bytesInTx := int64(tx.SerializeSize() + txOutPk.SerializeSize() + txOutFileHash.SerializeSize())
-
-	totalFeeInSatoshi := (feeSatoshiPerByte * bytesInTx) + 2000 // cover?
-	if totalIn < totalFeeInSatoshi {
-		return nil, fmt.Errorf("total tx in: %d, fee: %d. Not enough to cover fees", totalIn, totalFeeInSatoshi)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address %s: %w", changeAddress, err)
 	}
-	txOutPk.Value = totalIn - totalFeeInSatoshi
 
-	tx.AddTxOut(txOutPk)
-	tx.AddTxOut(txOutFileHash)
+	addressPkScript, err := txscript.PayToAddrScript(address)
 
-	txHex, err := SerializeBTCTxToHex(tx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pk script from address %s: %w", changeAddress, err)
+	}
+
+	if !txscript.IsPayToWitnessPubKeyHash(addressPkScript) {
+		return nil, fmt.Errorf("address %s is not a pay-to-witness-pubkey-hash", changeAddress)
+	}
+
+	fundingOutputIdx, err := outputIndexForPkScript(addressPkScript, fundingTx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find output index for pk script: %w", err)
+	}
+	fundingTxHash := fundingTx.TxHash()
+	fundingInput := wire.NewTxIn(
+		wire.NewOutPoint(&fundingTxHash, uint32(fundingOutputIdx)),
+		nil,
+		nil,
+	)
+
+	changeOutput := wire.NewTxOut(
+		fundingTx.TxOut[fundingOutputIdx].Value-fee,
+		addressPkScript,
+	)
+
+	timestampTx := wire.NewMsgTx(2)
+	timestampTx.AddTxIn(fundingInput)
+	timestampTx.AddTxOut(changeOutput)
+	timestampTx.AddTxOut(txOutFileHash)
+
+	txHex, err := SerializeBTCTxToHex(timestampTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize timestamping tx: %w", err)
 	}
 
 	return &TimestampFileOutput{
 		TimestampTx: txHex,
-		PkTapRoot:   hex.EncodeToString(taprootPkScript),
+		PkTapRoot:   "",
 		FileHash:    hex.EncodeToString(fileHash),
 	}, nil
 }
@@ -164,7 +190,7 @@ amount to it.`,
 	},
 }
 
-func CreateTimestampAcc(amountToSendStr, pubKeyHexStr string) (*TimestampAcc, error) {
+func CreateTimestampAcc(amountToSendStr, address string) (*TimestampAcc, error) {
 	amountToSend, err := strconv.ParseInt(amountToSendStr, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid amount %s: %w", amountToSendStr, err)
@@ -175,13 +201,24 @@ func CreateTimestampAcc(amountToSendStr, pubKeyHexStr string) (*TimestampAcc, er
 		return nil, err
 	}
 
-	taprootPkScript, err := deriveTaprootPkScript(pubKeyHexStr)
+	decodedAddress, err := btcutil.DecodeAddress(address, &chaincfg.RegressionNetParams)
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to create pay-to-taproot output key pk script: %w", err)
+		return nil, fmt.Errorf("invalid address %s: %w", address, err)
+	}
+
+	pkScript, err := txscript.PayToAddrScript(decodedAddress)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pk script from address %s: %w", address, err)
+	}
+
+	if !txscript.IsPayToWitnessPubKeyHash(pkScript) {
+		return nil, fmt.Errorf("address %s is not a pay-to-witness-pubkey-hash", address)
 	}
 
 	tx := wire.NewMsgTx(2)
-	tx.AddTxOut(wire.NewTxOut(int64(valueToSend), taprootPkScript))
+	tx.AddTxOut(wire.NewTxOut(int64(valueToSend), pkScript))
 
 	txHex, err := SerializeBTCTxToHex(tx)
 	if err != nil {
@@ -189,8 +226,8 @@ func CreateTimestampAcc(amountToSendStr, pubKeyHexStr string) (*TimestampAcc, er
 	}
 
 	return &TimestampAcc{
-		AccTx:      txHex,
-		TaprootAcc: hex.EncodeToString(taprootPkScript),
+		AccTx: txHex,
+		// TaprootAcc: hex.EncodeToString(taprootPkScript),
 	}, nil
 }
 
