@@ -92,7 +92,7 @@ func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutpu
 	tx.AddTxOut(txOutPk)
 	tx.AddTxOut(txOutFileHash)
 
-	txHex, err := serializeBTCTxToHex(tx)
+	txHex, err := SerializeBTCTxToHex(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize timestamping tx: %w", err)
 	}
@@ -158,7 +158,7 @@ func CreateTimestampAcc(amountToSendStr, pubKeyHexStr string) (*TimestampAcc, er
 	tx := wire.NewMsgTx(2)
 	tx.AddTxOut(wire.NewTxOut(int64(valueToSend), taprootPkScript))
 
-	txHex, err := serializeBTCTxToHex(tx)
+	txHex, err := SerializeBTCTxToHex(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize timestamping tx: %w", err)
 	}

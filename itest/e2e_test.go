@@ -27,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	"github.com/babylonchain/cli-tools/cmd"
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
 	"github.com/babylonchain/cli-tools/internal/db"
@@ -37,7 +38,8 @@ import (
 )
 
 const (
-	passphrase = "pass"
+	passphrase     = "pass"
+	FundWalletName = "test-wallet"
 )
 
 var (
@@ -104,7 +106,9 @@ func PurgeAllCollections(ctx context.Context, client *mongo.Client, databaseName
 
 func StartManager(
 	t *testing.T,
-	numMatureOutputsInWallet uint32) *TestManager {
+	numMatureOutputsInWallet uint32,
+	runMongodb bool,
+) *TestManager {
 	logger := logger.DefaultLogger()
 	m, err := containers.NewManager()
 	require.NoError(t, err)
@@ -115,17 +119,21 @@ func StartManager(
 	h := NewBitcoindHandler(t, m)
 	h.Start()
 
-	_, err = m.RunMongoDbResource()
-	require.NoError(t, err)
+	appConfig := config.DefaultConfig()
+
+	if runMongodb {
+		_, err = m.RunMongoDbResource()
+		require.NoError(t, err)
+
+		appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
+	}
 
 	// Give some time to launch mongo and bitcoind
 	time.Sleep(2 * time.Second)
 
-	_ = h.CreateWallet("test-wallet", passphrase)
+	_ = h.CreateWallet(FundWalletName, passphrase)
 	// only outputs which are 100 deep are mature
 	_ = h.GenerateBlocks(int(numMatureOutputsInWallet) + 100)
-
-	appConfig := config.DefaultConfig()
 
 	appConfig.Btc.Host = "127.0.0.1:18443"
 	appConfig.Btc.User = "user"
@@ -136,7 +144,6 @@ func StartManager(
 	signerCfg, signerGlobalParams, signingServer := startSigningServer(t, magicBytes)
 
 	appConfig.Signer = *signerCfg
-	appConfig.Db.Address = fmt.Sprintf("mongodb://%s", m.MongoHost())
 
 	var gp = services.ParsedGlobalParams{}
 
@@ -171,11 +178,6 @@ func StartManager(
 	fpKey, err := btcec.NewPrivateKey()
 	require.NoError(t, err)
 
-	testDbConnection, err := db.New(context.TODO(), appConfig.Db.DbName, appConfig.Db.Address)
-	require.NoError(t, err)
-
-	storeController := services.NewPersistentUnbondingStorage(testDbConnection)
-
 	pipeLine, err := services.NewUnbondingPipelineFromConfig(
 		logger,
 		appConfig,
@@ -183,7 +185,7 @@ func StartManager(
 	)
 	require.NoError(t, err)
 
-	return &TestManager{
+	tm := &TestManager{
 		t:                   t,
 		bitcoindHandler:     h,
 		walletPass:          passphrase,
@@ -197,10 +199,20 @@ func StartManager(
 		magicBytes:          []byte{0x0, 0x1, 0x2, 0x3},
 		pipeLineConfig:      appConfig,
 		pipeLine:            pipeLine,
-		testStoreController: storeController,
+		testStoreController: nil,
 		signingServer:       signingServer,
 		parameters:          &gp,
 	}
+
+	if runMongodb {
+		testDbConnection, err := db.New(context.TODO(), appConfig.Db.DbName, appConfig.Db.Address)
+		require.NoError(t, err)
+
+		storeController := services.NewPersistentUnbondingStorage(testDbConnection)
+		tm.testStoreController = storeController
+	}
+
+	return tm
 }
 
 func startSigningServer(
@@ -446,8 +458,80 @@ func (tm *TestManager) createNUnbondingTransactions(n int, d *stakingData) ([]*u
 	return unbondingTxs, sendStakingTransactions
 }
 
+func TestBtcTimestamp(t *testing.T) {
+	tm := StartManager(t, 10, false)
+
+	btcTimestampWalletName := "btc-file-timestamping"
+	resp := tm.bitcoindHandler.CreateWallet(btcTimestampWalletName, passphrase)
+	require.Equal(t, btcTimestampWalletName, resp.Name)
+
+	newAddr := tm.bitcoindHandler.GetNewAddress(btcTimestampWalletName)
+	require.NotEmpty(t, newAddr)
+	fmt.Printf("\n New Addr %s\n", newAddr.String())
+	// netParams
+	// payToAddrScript, err := txscript.PayToAddrScript(newAddr)
+	// require.NoError(t, err)
+	// err := tm.btcClient.LoadWallet(FundWalletName)
+	// require.NoError(t, err)
+
+	// err := tm.btcClient.UnlockWallet(60, tm.walletPass)
+	// require.NoError(t, err)
+
+	tm.bitcoindHandler.SendToAddress(FundWalletName, newAddr.String(), "15")
+	tm.bitcoindHandler.GenerateBlocks(5)
+	unspentTxt := tm.bitcoindHandler.ListUnspent(btcTimestampWalletName)
+	fmt.Printf("\nunspentTxt: %s", unspentTxt)
+
+	addrInfo := tm.bitcoindHandler.GetAddressInfo(btcTimestampWalletName, newAddr.String())
+	require.Equal(t, newAddr.String(), addrInfo.Address)
+	require.NotNil(t, addrInfo.PubKey)
+
+	pubKeyStr := *addrInfo.PubKey
+	require.Greater(t, len(pubKeyStr), 2)
+	pubKeyHex := pubKeyStr[2:]
+
+	timestampAcc, err := cmd.CreateTimestampAcc("14", pubKeyHex)
+	require.NoError(t, err)
+
+	fundedTx := tm.bitcoindHandler.FundRawTx(btcTimestampWalletName, timestampAcc.AccTx)
+
+	fundedTxHex, err := cmd.SerializeBTCTxToHex(fundedTx.Transaction)
+	require.NoError(t, err)
+	tm.bitcoindHandler.SignRawTxWithWallet(btcTimestampWalletName, fundedTxHex)
+
+	// cmd.CreateTimestampTx()
+	// amountToSend := int64(2500)
+	// txHash, err := tm.btcClient.TransferSatoshiTo(amountToSend, 10, newAddr, FundWalletName)
+	// require.NoError(t, err)
+	// require.NotNil(t, txHash)
+
+	// m.btcClient.CheckTxOutSpendable(
+	// 	[]*wire.TxOut{
+	// 		wire.NewTxOut(amountToSend, payToAddrScript)
+	// 	},
+
+	// )
+
+	// E2E test
+	// generate new addr
+	// get pub key
+	// crate-timestamp-account -> acc_tx_hex
+	// funded -> acc_tx_hex_funded
+	// signwithwallet -> tx_hex_signed
+	// sendrawtx
+	// create-timestamp-transaction [previous-timestamp-tx == acc_tx_hex_funded] [file-path] 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156
+	// txOut1 = txscript.NullDataScript(fileHash)
+
+	// txOut2= value as (originalOutput - fee) fee is calculated prob from btcd
+	// txOut2= taproot pk will continue to have funds...
+	// tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
+	// taprootPkScript, err := txscript.PayToTaprootScript(tapRootKey)
+
+	// Need to attach input to the new transaction to create
+}
+
 func TestSendingFreshTransactions(t *testing.T) {
-	m := StartManager(t, 10)
+	m := StartManager(t, 10, true)
 	d := defaultStakingData()
 	numUnbondingTxs := 10
 
@@ -520,7 +604,7 @@ func (tm *TestManager) updateSchnorSigInDb(newSig *schnorr.Signature, txHash *ch
 }
 
 func TestHandlingCriticalError(t *testing.T) {
-	m := StartManager(t, 10)
+	m := StartManager(t, 10, true)
 	d := defaultStakingData()
 
 	unb, stk := m.createNUnbondingTransactions(1, d)
