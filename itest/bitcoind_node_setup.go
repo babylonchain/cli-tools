@@ -132,7 +132,19 @@ func (h *BitcoindTestHandler) GetAddressInfo(rpcWallet, address string) btcjson.
 	require.NoError(h.t, err)
 
 	var result btcjson.GetAddressInfoResult
-	err = result.UnmarshalJSON(buff.Bytes())
+	err = json.Unmarshal(buff.Bytes(), &result)
+	require.NoError(h.t, err)
+
+	return result
+}
+
+func (h *BitcoindTestHandler) GetTransaction(txID string) btcjson.GetTransactionResult {
+	cmd := []string{"gettransaction", txID}
+	buff, _, err := h.m.ExecBitcoindCliCmd(h.t, cmd)
+	require.NoError(h.t, err)
+
+	var result btcjson.GetTransactionResult
+	err = json.Unmarshal(buff.Bytes(), &result)
 	require.NoError(h.t, err)
 
 	return result

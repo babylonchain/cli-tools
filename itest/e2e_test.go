@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -470,7 +473,7 @@ func TestBtcTimestamp(t *testing.T) {
 	require.NotEmpty(t, newAddr)
 	fmt.Printf("\n New Addr %s\n", newAddr.String())
 
-	btcd.SendToAddress(FundWalletName, newAddr.String(), "15")
+	btcd.SendToAddress(FundWalletName, newAddr.String(), "25")
 	btcd.GenerateBlocks(5)
 	unspentTxt := btcd.ListUnspent(wName)
 	fmt.Printf("\nunspentTxt: %s", unspentTxt)
@@ -483,7 +486,8 @@ func TestBtcTimestamp(t *testing.T) {
 	require.Greater(t, len(pubKeyStr), 2)
 	pubKeyHex := pubKeyStr[2:]
 
-	timestampAcc, err := cmd.CreateTimestampAcc("15000000", pubKeyHex)
+	amountToTaprootPk := int64(15000000)
+	timestampAcc, err := cmd.CreateTimestampAcc(strconv.FormatInt(amountToTaprootPk, 10), pubKeyHex)
 	require.NoError(t, err)
 
 	fundedTx := btcd.FundRawTx(wName, timestampAcc.AccTx)
@@ -496,6 +500,36 @@ func TestBtcTimestamp(t *testing.T) {
 	btcd.SendRawTx(wName, signedTxResult.Hex)
 	btcd.GenerateBlocks(5)
 
+	currentPath, err := os.Getwd()
+	require.NoError(t, err)
+	modFilePath := filepath.Join(currentPath, "../go.mod")
+	fmt.Printf("\nmodFilePath: %s", modFilePath)
+	fmt.Printf("\nStart Create Timestamp TX")
+
+	fundedTxOutputIdx := uint32(1) // is one, because when funding the tx it adds a new txout
+	for idx, txOut := range fundedTx.Transaction.TxOut {
+		if txOut.Value == amountToTaprootPk {
+			fundedTxOutputIdx = uint32(idx)
+			break
+		}
+	}
+
+	feeSatoshiPerByte := int64(5)
+	timestampFileOutput, err := cmd.CreateTimestampTx(signedTxResult.Hex, modFilePath, pubKeyHex, fundedTxOutputIdx, feeSatoshiPerByte)
+	require.NoError(t, err)
+	require.NotNil(t, timestampFileOutput)
+
+	fundedTx = btcd.FundRawTx(wName, timestampFileOutput.TimestampTx)
+	fundedTxHex, err = cmd.SerializeBTCTxToHex(fundedTx.Transaction)
+	require.NoError(t, err)
+
+	signedTxResult = btcd.SignRawTxWithWallet(wName, fundedTxHex)
+	txHashTimestampFile := btcd.SendRawTx(wName, signedTxResult.Hex)
+	btcd.GenerateBlocks(5)
+
+	fmt.Printf("\ntxHashTimestampFile: %s", txHashTimestampFile)
+	txResult := btcd.GetTransaction(txHashTimestampFile)
+	fmt.Printf("\ntxResult: %+v", txResult)
 	// cmd.CreateTimestampTx()
 	// amountToSend := int64(2500)
 	// txHash, err := tm.btcClient.TransferSatoshiTo(amountToSend, 10, newAddr, FundWalletName)
