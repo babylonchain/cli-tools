@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 
-	bbntypes "github.com/babylonchain/babylon/types"
-	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
@@ -19,7 +16,6 @@ import (
 )
 
 const (
-	FlagFundedTxOutputIdx = "tx-funded-output-idx"
 	FlagFeeSatoshiPerByte = "fee-satoshi-per-byte"
 )
 
@@ -30,15 +26,13 @@ type TimestampAcc struct {
 
 type TimestampFileOutput struct {
 	TimestampTx string `json:"timestamp_tx_hex"`
-	PkTapRoot   string `json:"pk_tap_root"`
 	FileHash    string `json:"file_hash"`
 }
 
 func init() {
-	_ = btcTimestampFileCmd.Flags().Uint32(FlagFundedTxOutputIdx, 0, "the idx of the output to spend in the txs")
-	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeSatoshiPerByte, 5, "the amount of satoshi to calculate as fee per byte")
+	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeSatoshiPerByte, 20, "the amount of satoshi to calculate as fee per byte")
+	_ = btcTimestampFileCmd.Flags().String(FlagNetwork, "signet", "network one of (mainnet, testnet3, regtest, simnet, signet)")
 
-	rootCmd.AddCommand(btcCreateTimestampAcc)
 	rootCmd.AddCommand(btcTimestampFileCmd)
 }
 
@@ -55,18 +49,23 @@ var btcTimestampFileCmd = &cobra.Command{
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fundedTxHex, inputFilePath, pubKeyHexStr := args[0], args[1], args[2]
+		flags := cmd.Flags()
+		feeSatoshiPerByte, err := flags.GetInt64(FlagFeeSatoshiPerByte)
+		if err != nil {
+			return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
+		}
 
-		// fundedTxOutputIdx, err := cmd.Flags().GetUint32(FlagFundedTxOutputIdx)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to parse flag %s: %w", FlagFundedTxOutputIdx, err)
-		// }
+		networkParamStr, err := flags.GetString(FlagNetwork)
+		if err != nil {
+			return fmt.Errorf("failed to parse flag %s: %w", FlagNetwork, err)
+		}
 
-		// feeSatoshiPerByte, err := cmd.Flags().GetInt64(FlagFeeSatoshiPerByte)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
-		// }
+		btcParams, err := getBtcNetworkParams(networkParamStr)
+		if err != nil {
+			return fmt.Errorf("unable parse BTC network %s: %w", networkParamStr, err)
+		}
 
-		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, 200)
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, feeSatoshiPerByte, btcParams)
 		if err != nil {
 			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
@@ -88,6 +87,7 @@ func outputIndexForPkScript(pkScript []byte, tx *wire.MsgTx) (int, error) {
 func CreateTimestampTx(
 	fundedTxHex, filePath, changeAddress string,
 	fee int64,
+	networkParams *chaincfg.Params,
 ) (*TimestampFileOutput, error) {
 	txOutFileHash, fileHash, err := txOutTimestampFile(filePath)
 	if err != nil {
@@ -99,14 +99,12 @@ func CreateTimestampTx(
 		return nil, fmt.Errorf("unable parse BTC Tx %s: %w", fundedTxHex, err)
 	}
 
-	address, err := btcutil.DecodeAddress(changeAddress, &chaincfg.RegressionNetParams)
-
+	address, err := btcutil.DecodeAddress(changeAddress, networkParams)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address %s: %w", changeAddress, err)
 	}
 
 	addressPkScript, err := txscript.PayToAddrScript(address)
-
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pk script from address %s: %w", changeAddress, err)
 	}
@@ -143,91 +141,7 @@ func CreateTimestampTx(
 
 	return &TimestampFileOutput{
 		TimestampTx: txHex,
-		PkTapRoot:   "",
 		FileHash:    hex.EncodeToString(fileHash),
-	}, nil
-}
-
-func sumValues(txs ...*wire.TxOut) (total int64) {
-	for _, tx := range txs {
-		total += tx.Value
-	}
-	return total
-}
-
-func deriveTaprootPkScript(pubKeyHexStr string) ([]byte, error) {
-	pubkey, err := bbntypes.NewBIP340PubKeyFromHex(pubKeyHexStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid public key %s: %w", pubKeyHexStr, err)
-	}
-
-	schnorrPk, err := schnorr.ParsePubKey(*pubkey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse public key %s: %w", pubKeyHexStr, err)
-	}
-
-	tapRootKey := txscript.ComputeTaprootKeyNoScript(schnorrPk)
-	return txscript.PayToTaprootScript(tapRootKey)
-}
-
-var btcCreateTimestampAcc = &cobra.Command{
-	Use:     "create-timestamp-account [value] [pub-key-hex]",
-	Example: `cli-tools create-timestamp-account 100000 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
-	Short: `Creates a timestamp btc account computed from the pub key by computing
-the taproot key with no script (ComputeTaprootKeyNoScript) and send the [value]
-amount to it.`,
-	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		amountToSendStr, pubKeyHexStr := args[0], args[1]
-
-		acc, err := CreateTimestampAcc(amountToSendStr, pubKeyHexStr)
-		if err != nil {
-			return fmt.Errorf("unable to create timestamp acc: %w", err)
-		}
-
-		PrintRespJSON(acc)
-		return nil
-	},
-}
-
-func CreateTimestampAcc(amountToSendStr, address string) (*TimestampAcc, error) {
-	amountToSend, err := strconv.ParseInt(amountToSendStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid amount %s: %w", amountToSendStr, err)
-	}
-
-	valueToSend, err := parseBtcAmount(amountToSend)
-	if err != nil {
-		return nil, err
-	}
-
-	decodedAddress, err := btcutil.DecodeAddress(address, &chaincfg.RegressionNetParams)
-
-	if err != nil {
-		return nil, fmt.Errorf("invalid address %s: %w", address, err)
-	}
-
-	pkScript, err := txscript.PayToAddrScript(decodedAddress)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to create pk script from address %s: %w", address, err)
-	}
-
-	if !txscript.IsPayToWitnessPubKeyHash(pkScript) {
-		return nil, fmt.Errorf("address %s is not a pay-to-witness-pubkey-hash", address)
-	}
-
-	tx := wire.NewMsgTx(2)
-	tx.AddTxOut(wire.NewTxOut(int64(valueToSend), pkScript))
-
-	txHex, err := SerializeBTCTxToHex(tx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize timestamping tx: %w", err)
-	}
-
-	return &TimestampAcc{
-		AccTx: txHex,
-		// TaprootAcc: hex.EncodeToString(taprootPkScript),
 	}, nil
 }
 
