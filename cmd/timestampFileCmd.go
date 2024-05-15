@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	FlagFeeSatoshiPerByte = "fee-satoshi-per-byte"
+	FlagFeeInTx = "fee-in-tx"
 )
 
 type TimestampAcc struct {
@@ -30,7 +30,7 @@ type TimestampFileOutput struct {
 }
 
 func init() {
-	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeSatoshiPerByte, 20, "the amount of satoshi to calculate as fee per byte")
+	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeInTx, 2000, "the amount of satoshi to pay as fee for the tx")
 	_ = btcTimestampFileCmd.Flags().String(FlagNetwork, "signet", "network one of (mainnet, testnet3, regtest, simnet, signet)")
 
 	rootCmd.AddCommand(btcTimestampFileCmd)
@@ -50,9 +50,9 @@ var btcTimestampFileCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fundedTxHex, inputFilePath, pubKeyHexStr := args[0], args[1], args[2]
 		flags := cmd.Flags()
-		feeSatoshiPerByte, err := flags.GetInt64(FlagFeeSatoshiPerByte)
+		feeInTx, err := flags.GetInt64(FlagFeeInTx)
 		if err != nil {
-			return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
+			return fmt.Errorf("failed to parse flag %s: %w", FlagFeeInTx, err)
 		}
 
 		networkParamStr, err := flags.GetString(FlagNetwork)
@@ -65,7 +65,7 @@ var btcTimestampFileCmd = &cobra.Command{
 			return fmt.Errorf("unable parse BTC network %s: %w", networkParamStr, err)
 		}
 
-		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, feeSatoshiPerByte, btcParams)
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, feeInTx, btcParams)
 		if err != nil {
 			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
