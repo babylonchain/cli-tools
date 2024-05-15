@@ -17,6 +17,7 @@ import (
 
 const (
 	FlagFundedTxOutputIdx = "tx-funded-output-idx"
+	FlagFeeSatoshiPerByte = "fee-satoshi-per-byte"
 )
 
 type TimestampAcc struct {
@@ -32,6 +33,7 @@ type TimestampFileOutput struct {
 
 func init() {
 	_ = btcTimestampFileCmd.Flags().Uint32(FlagFundedTxOutputIdx, 0, "the idx of the output to spend in the txs")
+	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeSatoshiPerByte, 5, "the amount of satoshi to calculate as fee per byte")
 
 	rootCmd.AddCommand(btcCreateTimestampAcc)
 	rootCmd.AddCommand(btcTimestampFileCmd)
@@ -56,7 +58,12 @@ var btcTimestampFileCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse flag %s: %w", FlagFundedTxOutputIdx, err)
 		}
 
-		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, fundedTxOutputIdx)
+		feeSatoshiPerByte, err := cmd.Flags().GetInt64(FlagFeeSatoshiPerByte)
+		if err != nil {
+			return fmt.Errorf("failed to parse flag %s: %w", FlagFeeSatoshiPerByte, err)
+		}
+
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, fundedTxOutputIdx, feeSatoshiPerByte)
 		if err != nil {
 			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
@@ -66,7 +73,7 @@ var btcTimestampFileCmd = &cobra.Command{
 	},
 }
 
-func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutputIdx uint32) (*TimestampFileOutput, error) {
+func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutputIdx uint32, feeSatoshiPerByte int64) (*TimestampFileOutput, error) {
 	txOutFileHash, fileHash, err := txOutTimestampFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tx out with filepath %s: %w", filePath, err)
@@ -85,10 +92,21 @@ func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutpu
 	fundedTxOutPoint := wire.NewOutPoint(&fundedTxHash, fundedTxOutputIdx)
 	txOutputAsInput := wire.NewTxIn(fundedTxOutPoint, nil, nil)
 
-	txOutPk := wire.NewTxOut(int64(0), taprootPkScript)
+	// TODO: refactory fee calc
+	totalIn := sumValues(fundedTx.TxOut[fundedTxOutputIdx])
 
 	tx := wire.NewMsgTx(2)
 	tx.AddTxIn(txOutputAsInput)
+
+	txOutPk := wire.NewTxOut(0, taprootPkScript)
+	bytesInTx := int64(tx.SerializeSize() + txOutPk.SerializeSize() + txOutFileHash.SerializeSize())
+
+	totalFeeInSatoshi := (feeSatoshiPerByte * bytesInTx) + 2000 // cover?
+	if totalIn < totalFeeInSatoshi {
+		return nil, fmt.Errorf("total tx in: %d, fee: %d. Not enough to cover fees", totalIn, totalFeeInSatoshi)
+	}
+	txOutPk.Value = totalIn - totalFeeInSatoshi
+
 	tx.AddTxOut(txOutPk)
 	tx.AddTxOut(txOutFileHash)
 
@@ -102,6 +120,13 @@ func CreateTimestampTx(fundedTxHex, filePath, pubKeyHexStr string, fundedTxOutpu
 		PkTapRoot:   hex.EncodeToString(taprootPkScript),
 		FileHash:    hex.EncodeToString(fileHash),
 	}, nil
+}
+
+func sumValues(txs ...*wire.TxOut) (total int64) {
+	for _, tx := range txs {
+		total += tx.Value
+	}
+	return total
 }
 
 func deriveTaprootPkScript(pubKeyHexStr string) ([]byte, error) {
