@@ -462,28 +462,20 @@ func TestBtcTimestamp(t *testing.T) {
 	tm := StartManager(t, 10, false)
 	btcd := tm.bitcoindHandler
 
-	btcTimestampWalletName := "btc-file-timestamping"
-	resp := btcd.CreateWallet(btcTimestampWalletName, passphrase)
-	require.Equal(t, btcTimestampWalletName, resp.Name)
+	wName := "btc-file-timestamping"
+	resp := btcd.CreateWallet(wName, passphrase)
+	require.Equal(t, wName, resp.Name)
 
-	newAddr := btcd.GetNewAddress(btcTimestampWalletName)
+	newAddr := btcd.GetNewAddress(wName)
 	require.NotEmpty(t, newAddr)
 	fmt.Printf("\n New Addr %s\n", newAddr.String())
-	// netParams
-	// payToAddrScript, err := txscript.PayToAddrScript(newAddr)
-	// require.NoError(t, err)
-	// err := tm.btcClient.LoadWallet(FundWalletName)
-	// require.NoError(t, err)
-
-	// err := tm.btcClient.UnlockWallet(60, tm.walletPass)
-	// require.NoError(t, err)
 
 	btcd.SendToAddress(FundWalletName, newAddr.String(), "15")
 	btcd.GenerateBlocks(5)
-	unspentTxt := btcd.ListUnspent(btcTimestampWalletName)
+	unspentTxt := btcd.ListUnspent(wName)
 	fmt.Printf("\nunspentTxt: %s", unspentTxt)
 
-	addrInfo := btcd.GetAddressInfo(btcTimestampWalletName, newAddr.String())
+	addrInfo := btcd.GetAddressInfo(wName, newAddr.String())
 	require.Equal(t, newAddr.String(), addrInfo.Address)
 	require.NotNil(t, addrInfo.PubKey)
 
@@ -494,12 +486,15 @@ func TestBtcTimestamp(t *testing.T) {
 	timestampAcc, err := cmd.CreateTimestampAcc("15000000", pubKeyHex)
 	require.NoError(t, err)
 
-	fundedTx := btcd.FundRawTx(btcTimestampWalletName, timestampAcc.AccTx)
+	fundedTx := btcd.FundRawTx(wName, timestampAcc.AccTx)
 	fundedTxHex, err := cmd.SerializeBTCTxToHex(fundedTx.Transaction)
 	require.NoError(t, err)
 
-	btcd.WalletPassphrase(btcTimestampWalletName, passphrase)
-	btcd.SignRawTxWithWallet(btcTimestampWalletName, fundedTxHex)
+	btcd.WalletPassphrase(wName, passphrase, "70")
+	signedTxResult := btcd.SignRawTxWithWallet(wName, fundedTxHex)
+
+	btcd.SendRawTx(wName, signedTxResult.Hex)
+	btcd.GenerateBlocks(5)
 
 	// cmd.CreateTimestampTx()
 	// amountToSend := int64(2500)
