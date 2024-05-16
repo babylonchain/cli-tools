@@ -25,6 +25,8 @@ deployment:
     workload: "btc"
   annotations:
     configmap.reloader.stakater.com/reload: "unbonding-pipeline, phase1-global-config"
+service:
+  enabled: false
 configFiles:
   config.toml: |
     # This is a TOML config file.
