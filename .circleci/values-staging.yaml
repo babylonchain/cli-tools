@@ -1,0 +1,63 @@
+namespace: phase-1-staging
+name: unbonding-pipeline
+deployment:
+  image: 490721144737.dkr.ecr.us-east-1.amazonaws.com/cli-tools
+  version: REPLACEME
+  replicas: 1
+  volumes:
+    - name: unbonding-pipeline-configs
+      projected:
+        sources:
+          - configMap:
+              name: unbonding-pipeline
+          - configMap:
+              name: phase1-global-config
+  volumeMounts:
+    - name: unbonding-pipeline-configs
+      mountPath: /home/cli-tools/.tools
+  command: |
+    while true
+    do
+      cli-tools run-unbonding-pipeline --config /home/cli-tools/.tools/config.toml
+      sleep 30
+    done
+  nodeSelector:
+    workload: "staging"
+  annotations:
+    configmap.reloader.stakater.com/reload: "unbonding-pipeline, phase1-global-config"
+configFiles:
+  config.toml: |
+    # This is a TOML config file.
+    # For more information, see https://github.com/toml-lang/toml
+
+    [db-config]
+    # The network chain ID
+    db-name = "staking-api-service"
+    # The keyring's backend, where the keys are stored (os|file|kwallet|pass|test|memory)
+    address = "mongodb://mongodb-staging-headless.mongodb-staking-api:27017"
+
+    [btc-config]
+    # Btc node host
+    host = "bitcoind-staging.bitcoind-signet:38332"
+    # Btc node user
+    user = "BTC_USER"
+    # Btc node password
+    pass = "BTC_PASSWORD"
+    # Btc network (testnet3|mainnet|regtest|simnet|signet)
+    network = "signet"
+
+    [remote-signer-config]
+    # The list of signer urls in the format http://covenant_pk@signer_host:port
+    urls = [
+      "http://0381b70c01535f5153a8039c21150c53f3e49a083555b57930103db8a7272ff336@covenant-signer.phase-1-staging:9791",
+      "http://02159f46467124f6bbba77060520571ddb07c7e95ff54d8b9958ec0b0d59d86c03@covenant-signer.phase-1-staging:9791",
+      "http://039705be04f3a3eb5c3d0dd61e648e06ea8170975744594fe702e8088bcceff375@covenant-signer.phase-1-staging:9791",
+      "http://03d21faf78c6751a0d38e6bd8028b907ff07e9a869a43fc837d6b3f8dff6119a36@51.210.144.135:9791",
+      "http://0340afaf47c4ffa56de86410d8e47baa2bb6f04b604f4ea24323737ddc3fe092df@54.167.222.28:9791",
+      "https://03f5199efae3f28bb82476163a7e458c7ad445d9bffb0682d10d3bdb2cb41f8e8e@babylon-covenant-signer.alt.technology:443",
+      "https://023bb93dfc8b61887d771f3630e9a63e97cbafcfcc78556a474df83a31a0ef899c@babylon-covenant-signer.zellic.io:443",
+      "http://0379a71ffd71c503ef2e2f91bccfc8fcda7946f4653cef0d9f3dde20795ef3b9f0@covenant-signer.phase-1-staging:9791",
+      "https://02113c3a32a9d320b72190a04a020a0db3976ef36972673258e9a38a364f3dc3b0@bbn-test-4-covsign.cubestake.xyz:443"
+    ]
+    # The timeout of each request to the remote signing server
+    timeout = 10
