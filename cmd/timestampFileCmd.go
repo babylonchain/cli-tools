@@ -19,11 +19,6 @@ const (
 	FlagFeeInTx = "fee-in-tx"
 )
 
-type TimestampAcc struct {
-	AccTx      string `json:"acc_tx_hex"`
-	TaprootAcc string `json:"taproot_acc_hex"`
-}
-
 type TimestampFileOutput struct {
 	TimestampTx string `json:"timestamp_tx_hex"`
 	FileHash    string `json:"file_hash"`
