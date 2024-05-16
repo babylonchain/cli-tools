@@ -51,9 +51,9 @@ configFiles:
     [remote-signer-config]
     # The list of signer urls in the format http://covenant_pk@signer_host:port
     urls = [
-      "http://0381b70c01535f5153a8039c21150c53f3e49a083555b57930103db8a7272ff336@covenant-signer.phase-1-staging:9791",
-      "http://02159f46467124f6bbba77060520571ddb07c7e95ff54d8b9958ec0b0d59d86c03@covenant-signer.phase-1-staging:9791",
-      "http://039705be04f3a3eb5c3d0dd61e648e06ea8170975744594fe702e8088bcceff375@covenant-signer.phase-1-staging:9791",
+      "https://0249766ccd9e3cd94343e2040474a77fb37cdfd30530d05f9f1e96ae1e2102c86e@covenant-signer0.COVENANT_SIGNER_DOMAIN:443",
+      "https://0276d1ae01f8fb6bf30108731c884cddcf57ef6eef2d9d9559e130894e0e40c62c@covenant-signer1.COVENANT_SIGNER_DOMAIN:443",
+      "https://0217921cf156ccb4e73d428f996ed11b245313e37e27c978ac4d2cc21eca4672e4@covenant-signer2.COVENANT_SIGNER_DOMAIN:443",
       "http://03d21faf78c6751a0d38e6bd8028b907ff07e9a869a43fc837d6b3f8dff6119a36@51.210.144.135:9791",
       "http://0340afaf47c4ffa56de86410d8e47baa2bb6f04b604f4ea24323737ddc3fe092df@54.167.222.28:9791",
       "https://03f5199efae3f28bb82476163a7e458c7ad445d9bffb0682d10d3bdb2cb41f8e8e@babylon-covenant-signer.alt.technology:443",
