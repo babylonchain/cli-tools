@@ -37,18 +37,18 @@ func init() {
 }
 
 var btcTimestampFileCmd = &cobra.Command{
-	Use:     "create-timestamp-transaction [previous-timestamp-tx] [file-path] [pub-key-hex]",
-	Example: `cli-tools btc-timestamp-file [funded-tx-hex] ./path/to/file/to/timestamp 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
+	Use:     "create-timestamp-transaction [funded-tx-addr-hex] [file-path] [address]",
+	Example: `cli-tools create-timestamp-transaction [funded-tx-addr-hex] ./path/to/file/to/timestamp 836e9fc730ff37de48f2ff3a76b3c2380fbabaf66d9e50754d86b2a2e2952156`,
 	Short:   "Creates a timestamp btc transaction by hashing the file input.",
-	Long: `Creates a timestamp BTC transaction with 2 outputs.
-	The first output is the nullDataScript of the file hash, as the file hash
-	being the sha256 of the input file path. This first output is the timestamp of the file.
-	The second output is the taproot derived from the pubkey with ComputeTaprootKeyNoScript
-	and PayToTaprootScript with the value as ({funded-tx-output} - {fees}). The second
-	output is needed to continue to have spendable funds to the taproot pk.`,
+	Long: `Creates a timestamp BTC transaction with 2 outputs and one input.
+	One output is the nullDataScript of the file hash, as the file hash
+	being the sha256 of the input file path. This output is the timestamp of the file.
+	The other output is the pay to addr script which contains the pay to witness pubkey
+  with the value as ({funded-tx-output-value} - {FlagFeeInTx}). This output is needed
+	to continue to have spendable funds to the p2wpkh address.`,
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fundedTxHex, inputFilePath, pubKeyHexStr := args[0], args[1], args[2]
+		fundedTxHex, inputFilePath, addressStr := args[0], args[1], args[2]
 		flags := cmd.Flags()
 		feeInTx, err := flags.GetInt64(FlagFeeInTx)
 		if err != nil {
@@ -65,7 +65,7 @@ var btcTimestampFileCmd = &cobra.Command{
 			return fmt.Errorf("unable parse BTC network %s: %w", networkParamStr, err)
 		}
 
-		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, pubKeyHexStr, feeInTx, btcParams)
+		timestampOutput, err := CreateTimestampTx(fundedTxHex, inputFilePath, addressStr, feeInTx, btcParams)
 		if err != nil {
 			return fmt.Errorf("failed to create timestamping tx: %w", err)
 		}
@@ -84,6 +84,11 @@ func outputIndexForPkScript(pkScript []byte, tx *wire.MsgTx) (int, error) {
 	return -1, fmt.Errorf("unable to find output index for pk script")
 }
 
+// CreateTimestampTx outputs the hash of file and BTC transaction that timestamp that
+// hash in one of the outputs. The funded tx needs to have one output with value
+// for the changeAddress p2wpkh. The changeAddress needs to be a EncodeAddress
+// which is the encoding of the payment address associated with the Address value,
+// to be used to generate a pay to address script pay-to-witness-pubkey-hash (P2WKH) format.
 func CreateTimestampTx(
 	fundedTxHex, filePath, changeAddress string,
 	fee int64,
