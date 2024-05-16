@@ -5,7 +5,7 @@
 The command `create-timestamp-transaction` is used to timestamp a file into bitcoin.
 Timestamp a file, means generating a hash of the file (SHA256) and creating a
 `NullDataScript` with the hash in it with zero value. This transaction needs
-a funded encoded address that converts pbukeys to P2PKH addresses.
+a funded encoded address that converts pubkeys to P2WPKH addresses.
 
 To test, you need a running bitcoind and funds.
 
