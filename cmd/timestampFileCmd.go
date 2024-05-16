@@ -30,7 +30,7 @@ type TimestampFileOutput struct {
 }
 
 func init() {
-	_ = btcTimestampFileCmd.Flags().Uint32(FlagFeeInTx, 2000, "the amount of satoshi to pay as fee for the tx")
+	_ = btcTimestampFileCmd.Flags().Int64(FlagFeeInTx, 2000, "the amount of satoshi to pay as fee for the tx")
 	_ = btcTimestampFileCmd.Flags().String(FlagNetwork, "signet", "network one of (mainnet, testnet3, regtest, simnet, signet)")
 
 	rootCmd.AddCommand(btcTimestampFileCmd)

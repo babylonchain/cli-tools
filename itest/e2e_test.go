@@ -474,12 +474,12 @@ func TestBtcTimestamp(t *testing.T) {
 	newAddr := btcd.GetNewAddress(wName)
 	require.NotEmpty(t, newAddr)
 
-	newAddrPkScript, err := txscript.PayToAddrScript(newAddr)
-	require.NoError(t, err)
-
 	// fund the new addr
 	fundingTxHash := btcd.SendToAddress(FundWalletName, newAddr.String(), "25")
 	btcd.GenerateBlocks(5)
+
+	newAddrPkScript, err := txscript.PayToAddrScript(newAddr)
+	require.NoError(t, err)
 
 	tx, conf, err := tm.btcClient.TxDetails(fundingTxHash, newAddrPkScript)
 	require.NoError(t, err)
