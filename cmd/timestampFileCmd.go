@@ -124,8 +124,13 @@ func CreateTimestampTx(
 		nil,
 	)
 
+	valueIn := fundingTx.TxOut[fundingOutputIdx].Value
+	if valueIn < fee {
+		return nil, fmt.Errorf("the value of input in %d is bigger than the fee %d", valueIn, fee)
+	}
+
 	changeOutput := wire.NewTxOut(
-		fundingTx.TxOut[fundingOutputIdx].Value-fee,
+		valueIn-fee,
 		addressPkScript,
 	)
 
