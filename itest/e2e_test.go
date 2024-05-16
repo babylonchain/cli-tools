@@ -521,6 +521,35 @@ func TestBtcTimestamp(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, btcclient.TxInChain, stxState)
 	require.NotNil(t, stxConfirmation)
+
+	// check timestamp from funded timestamp tx
+	fundedFromTxTimestamp, err := cmd.SerializeBTCTxToHex(stx)
+	require.NoError(t, err)
+
+	timestampOutputFromFundedTimestamp, err := cmd.CreateTimestampTx(
+		fundedFromTxTimestamp,
+		modFilePath,
+		newAddr.EncodeAddress(),
+		3000,
+		netParams,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, timestampOutputFromFundedTimestamp)
+
+	signTxFromTimest := btcd.SignRawTxWithWallet(wName, timestampOutputFromFundedTimestamp.TimestampTx)
+
+	btcd.SendRawTx(wName, signTxFromTimest.Hex)
+	btcd.GenerateBlocks(5)
+
+	timestampTxFromTimestampTx, _, err := utils.NewBTCTxFromHex(timestampOutputFromFundedTimestamp.TimestampTx)
+	require.NoError(t, err)
+
+	timestampTxHash := timestampTxFromTimestampTx.TxHash()
+
+	stxConfirmation, stxState, err = tm.btcClient.TxDetails(&timestampTxHash, newAddrPkScript)
+	require.NoError(t, err)
+	require.Equal(t, btcclient.TxInChain, stxState)
+	require.NotNil(t, stxConfirmation)
 }
 
 func TestSendingFreshTransactions(t *testing.T) {
