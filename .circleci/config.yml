@@ -90,6 +90,10 @@ workflows:
           filters:
             tags:
               only: /.*/
+            branches:
+              only:
+                - main
+                - dev
       - push_docker:
           requires:
             - build_docker
