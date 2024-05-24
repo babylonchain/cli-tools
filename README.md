@@ -1,7 +1,11 @@
-# CLI-TOOLS
+# CLI-Tools
 
-Set of CLI tool which are used for different purposes. See  [deployment guide](/docs/commands.md)
-to review all available commands
+Set of CLI tool which are used for different purposes:
+- processing unbonding requests
+- building test staking/unbonding/withdraw phase-1 Bitcoin transactions
+- building Bitcon transactions timestamping files
+
+See  [deployment guide](/docs/commands.md) to review all available commands.
 
 ### Installation
 
@@ -9,7 +13,7 @@ to review all available commands
 
 This project requires Go version 1.21 or later.
 
-Install Go by following the instructions on the official Go installation guide.
+Install Go by following the instructions on the official Go installation [guide](https://go.dev/doc/install).
 
 #### Download the code
 
@@ -33,7 +37,7 @@ make install
 ```
 
 The above command will build and install the `cli-tools` binary to
-`$GOPATH/bin`, which is the cli program with set of different commands.
+`$GOPATH/bin`.
 
 If your shell cannot find the installed binaries, make sure `$GOPATH/bin` is in
 the `$PATH` of your shell. The following updates to `$PATH` can be performed to
