@@ -138,3 +138,51 @@ $ bitcoin-cli -rpcwallet=timestamp-w gettransaction 25b65b31c6f4d2f46ebeb5fa4c9a
   }
 }
 ```
+
+## BTC Transaction creation commands
+
+All 3 commands:
+- `create-phase1-staking-tx`
+- `create-phase1-unbonding-request`
+- `create-phase1-withdaw-request`
+
+Are used to create transactions that should be compatible with phase-1 system.
+The main goal of those commands is to ease up testing of phase-1 system from the command
+line.
+
+Disclaimer: Those commands should only be used for testing purposes and should not be
+used with real BTC.
+
+## Dump config command
+
+Some of the commands require a config file to work properly. To generate a config
+file `dump-cfg` command can be used.
+
+Command:
+
+```shell
+cli-tools dump-cfg --config "./config.toml"
+```
+
+will generate `config.toml` file in the same directory as `cli-tools` program
+binary.
+
+
+## Unbonding processing commands
+
+There are two commands responsible for processing unbonding requests:
+- `run-unbonding-pipeline`
+- `process-failed-transactions`
+
+Both of those commands require:
+- config file path
+- global parameters paths
+
+Example:
+
+```shell
+cli-tools run-unbonding-pipeline --config "./config/config.toml" --params "./config/global-params.json"
+```
+
+For these commands to work, they must have access to the data source (mongo-db) containing
+unbonding transactions already signed by staker, and validated by some other process
