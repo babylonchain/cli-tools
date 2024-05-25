@@ -137,6 +137,7 @@ func NewUnbondingPipeline(
 		signer:    signer,
 		sender:    sender,
 		retriever: retriever,
+		Metrics:   metrics,
 		btcParams: btcParams,
 	}
 }
