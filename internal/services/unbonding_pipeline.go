@@ -10,6 +10,9 @@ import (
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
 	"github.com/babylonchain/cli-tools/internal/db"
+	"github.com/prometheus/client_golang/prometheus/push"
+
+	// "github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -29,8 +32,12 @@ func wrapCrititical(err error) error {
 	return fmt.Errorf("%s:%w", err.Error(), ErrCriticalError)
 }
 
-func pubKeyToString(pubKey *btcec.PublicKey) string {
+func pubKeyToStringSchnorr(pubKey *btcec.PublicKey) string {
 	return hex.EncodeToString(schnorr.SerializePubKey(pubKey))
+}
+
+func pubKeyToStringCompressed(pubKey *btcec.PublicKey) string {
+	return hex.EncodeToString(pubKey.SerializeCompressed())
 }
 
 type SystemParamsRetriever struct {
@@ -65,6 +72,7 @@ type UnbondingPipeline struct {
 	signer    CovenantSigner
 	sender    BtcSender
 	retriever ParamsRetriever
+	Metrics   *PipelineMetrics
 	btcParams *chaincfg.Params
 }
 
@@ -101,12 +109,15 @@ func NewUnbondingPipelineFromConfig(
 		return nil, err
 	}
 
+	m := NewPipelineMetrics(&cfg.Metrics)
+
 	return NewUnbondingPipeline(
 		logger,
 		store,
 		signer,
 		bs,
 		ret,
+		m,
 		cfg.Btc.MustGetBtcNetworkParams(),
 	), nil
 }
@@ -117,6 +128,7 @@ func NewUnbondingPipeline(
 	signer CovenantSigner,
 	sender BtcSender,
 	retriever ParamsRetriever,
+	metrics *PipelineMetrics,
 	btcParams *chaincfg.Params,
 ) *UnbondingPipeline {
 	return &UnbondingPipeline{
@@ -174,21 +186,21 @@ func (up *UnbondingPipeline) signUnbondingTransaction(
 }
 
 func (up *UnbondingPipeline) requestSigFromCovenant(req *SignRequest, resultChan chan *SignResult) {
-	pkStr := pubKeyToString(req.SignerPubKey)
+	pkStr := pubKeyToStringCompressed(req.SignerPubKey)
 	up.logger.Debug("request signatures from covenant signer",
 		"signer_pk", pkStr)
 
 	var res SignResult
 	sigPair, err := up.signer.SignUnbondingTransaction(req)
 	if err != nil {
-		// TODO record metrics
+		up.Metrics.RecordFailedSigningRequest(pkStr)
 		up.logger.Error("failed to get signatures from covenant",
 			"signer_pk", pkStr,
 			"error", err)
 
 		res.Err = err
 	} else {
-		// TODO: record metrics
+		up.Metrics.RecordSuccessSigningRequest(pkStr)
 		up.logger.Debug("got signatures from covenant signer", "signer_pk", pkStr)
 
 		res.PubKeySig = sigPair
@@ -211,6 +223,22 @@ func outputsAreEqual(a, b *wire.TxOut) bool {
 	}
 
 	return true
+}
+
+func (up *UnbondingPipeline) pushMetrics() error {
+	gateWayAdderss, err := up.Metrics.Config.Address()
+	if err != nil {
+		return fmt.Errorf("failed to get gateway address: %w", err)
+	}
+
+	up.logger.Info("Pushing metrics to gateway", "gateway", gateWayAdderss)
+
+	return push.New(gateWayAdderss, "unbonding-pipeline").
+		Collector(up.Metrics.SuccessigningReqs).
+		Collector(up.Metrics.FailedsigningReqs).
+		Collector(up.Metrics.SuccessfulSentTransactions).
+		Collector(up.Metrics.FailureSentTransactions).
+		Push()
 }
 
 func (up *UnbondingPipeline) processUnbondingTransactions(
@@ -317,6 +345,7 @@ func (up *UnbondingPipeline) processUnbondingTransactions(
 			if err := up.store.SetUnbondingTransactionProcessingFailed(ctx, utx); err != nil {
 				return wrapCrititical(err)
 			}
+			up.Metrics.RecordFailedUnbodingTransaction()
 		} else {
 			up.logger.Info(
 				"Successfully sent unbonding transaction",
@@ -325,8 +354,10 @@ func (up *UnbondingPipeline) processUnbondingTransactions(
 			if err := up.store.SetUnbondingTransactionProcessed(ctx, utx); err != nil {
 				return wrapCrititical(err)
 			}
+			up.Metrics.RecordSentUnbondingTransaction()
 		}
 	}
+
 	return nil
 }
 
@@ -354,6 +385,12 @@ func (up *UnbondingPipeline) ProcessNewTransactions(ctx context.Context) error {
 		return err
 	}
 
+	if up.Metrics.Config.Enabled {
+		if err := up.pushMetrics(); err != nil {
+			up.logger.Error("Failed to push metrics", "error", err)
+		}
+	}
+
 	up.logger.Info("Unbonding pipeline run for new transactions finished.", "num_tx_processed", len(unbondingTransactions))
 	return nil
 }
@@ -374,6 +411,12 @@ func (up *UnbondingPipeline) ProcessFailedTransactions(ctx context.Context) erro
 
 	if err := up.processUnbondingTransactions(ctx, unbondingTransactions); err != nil {
 		return err
+	}
+
+	if up.Metrics.Config.Enabled {
+		if err := up.pushMetrics(); err != nil {
+			up.logger.Error("Failed to push metrics", "error", err)
+		}
 	}
 
 	up.logger.Info("Unbonding pipeline for failed transactions finished.", "num_tx_processed", len(unbondingTransactions))
