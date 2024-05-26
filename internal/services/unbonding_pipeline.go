@@ -10,14 +10,11 @@ import (
 	"github.com/babylonchain/cli-tools/internal/btcclient"
 	"github.com/babylonchain/cli-tools/internal/config"
 	"github.com/babylonchain/cli-tools/internal/db"
-	"github.com/prometheus/client_golang/prometheus/push"
-
-	// "github.com/prometheus/client_golang/prometheus/promauto"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/prometheus/client_golang/prometheus/push"
 )
 
 var (
@@ -235,8 +232,8 @@ func (up *UnbondingPipeline) pushMetrics() error {
 	up.logger.Info("Pushing metrics to gateway", "gateway", gateWayAdderss)
 
 	return push.New(gateWayAdderss, "unbonding-pipeline").
-		Collector(up.Metrics.SuccessigningReqs).
-		Collector(up.Metrics.FailedsigningReqs).
+		Collector(up.Metrics.SuccessSigningReqs).
+		Collector(up.Metrics.FailedSigningReqs).
 		Collector(up.Metrics.SuccessfulSentTransactions).
 		Collector(up.Metrics.FailureSentTransactions).
 		Push()

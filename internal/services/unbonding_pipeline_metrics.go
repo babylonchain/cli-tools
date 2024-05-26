@@ -6,8 +6,8 @@ import (
 )
 
 type PipelineMetrics struct {
-	SuccessigningReqs          *prometheus.CounterVec
-	FailedsigningReqs          *prometheus.CounterVec
+	SuccessSigningReqs         *prometheus.CounterVec
+	FailedSigningReqs          *prometheus.CounterVec
 	SuccessfulSentTransactions prometheus.Counter
 	FailureSentTransactions    prometheus.Counter
 	Config                     *config.MetricsConfig
@@ -15,14 +15,14 @@ type PipelineMetrics struct {
 
 func NewPipelineMetrics(cfg *config.MetricsConfig) *PipelineMetrics {
 	return &PipelineMetrics{
-		SuccessigningReqs: prometheus.NewCounterVec(
+		SuccessSigningReqs: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "number_of_successful_signing_requests",
 				Help: "How many signing requests to given covenant were successful",
 			},
 			[]string{"covenant_pk"},
 		),
-		FailedsigningReqs: prometheus.NewCounterVec(
+		FailedSigningReqs: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "number_of_failed_signing_requests",
 				Help: "How many signing requests to given covenant failed",
@@ -46,11 +46,11 @@ func NewPipelineMetrics(cfg *config.MetricsConfig) *PipelineMetrics {
 }
 
 func (pm *PipelineMetrics) RecordSuccessSigningRequest(covenantPk string) {
-	pm.SuccessigningReqs.WithLabelValues(covenantPk).Inc()
+	pm.SuccessSigningReqs.WithLabelValues(covenantPk).Inc()
 }
 
 func (pm *PipelineMetrics) RecordFailedSigningRequest(covenantPk string) {
-	pm.FailedsigningReqs.WithLabelValues(covenantPk).Inc()
+	pm.FailedSigningReqs.WithLabelValues(covenantPk).Inc()
 }
 
 func (pm *PipelineMetrics) RecordSentUnbondingTransaction() {
