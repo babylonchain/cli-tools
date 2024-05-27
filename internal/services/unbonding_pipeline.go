@@ -379,14 +379,16 @@ func (up *UnbondingPipeline) ProcessNewTransactions(ctx context.Context) error {
 		return nil
 	}
 
+	defer func() {
+		if up.Metrics.Config.Enabled {
+			if err := up.pushMetrics(); err != nil {
+				up.logger.Error("Failed to push metrics", "error", err)
+			}
+		}
+	}()
+
 	if err := up.processUnbondingTransactions(ctx, unbondingTransactions); err != nil {
 		return err
-	}
-
-	if up.Metrics.Config.Enabled {
-		if err := up.pushMetrics(); err != nil {
-			up.logger.Error("Failed to push metrics", "error", err)
-		}
 	}
 
 	up.logger.Info("Unbonding pipeline run for new transactions finished.", "num_tx_processed", len(unbondingTransactions))
@@ -407,14 +409,16 @@ func (up *UnbondingPipeline) ProcessFailedTransactions(ctx context.Context) erro
 		return nil
 	}
 
+	defer func() {
+		if up.Metrics.Config.Enabled {
+			if err := up.pushMetrics(); err != nil {
+				up.logger.Error("Failed to push metrics", "error", err)
+			}
+		}
+	}()
+
 	if err := up.processUnbondingTransactions(ctx, unbondingTransactions); err != nil {
 		return err
-	}
-
-	if up.Metrics.Config.Enabled {
-		if err := up.pushMetrics(); err != nil {
-			up.logger.Error("Failed to push metrics", "error", err)
-		}
 	}
 
 	up.logger.Info("Unbonding pipeline for failed transactions finished.", "num_tx_processed", len(unbondingTransactions))
