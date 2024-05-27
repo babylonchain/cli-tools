@@ -224,14 +224,14 @@ func outputsAreEqual(a, b *wire.TxOut) bool {
 }
 
 func (up *UnbondingPipeline) pushMetrics() error {
-	gateWayAdderss, err := up.Metrics.Config.Address()
+	gatewayUrl, err := up.Metrics.Config.Address()
 	if err != nil {
 		return fmt.Errorf("failed to get gateway address: %w", err)
 	}
 
-	up.logger.Info("Pushing metrics to gateway", "gateway", gateWayAdderss)
+	up.logger.Info("Pushing metrics to gateway", "gateway", gatewayUrl)
 
-	return push.New(gateWayAdderss, "unbonding-pipeline").
+	return push.New(gatewayUrl, "unbonding-pipeline").
 		Collector(up.Metrics.SuccessSigningReqs).
 		Collector(up.Metrics.FailedSigningReqs).
 		Collector(up.Metrics.SuccessfulSentTransactions).
