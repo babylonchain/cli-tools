@@ -49,7 +49,7 @@ require (
 )
 
 require (
-	github.com/babylonchain/covenant-signer v0.1.2
+	github.com/babylonchain/covenant-signer v0.2.5
 	github.com/babylonchain/networks/parameters v0.2.1
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.4
@@ -326,5 +326,3 @@ require (
 	pgregory.net/rapid v1.1.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/babylonchain/covenant-signer => github.com/babylonchain/covenant-signer-private v0.2.5
